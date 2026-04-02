@@ -26,7 +26,7 @@ export type BackfillOptions = {
 };
 
 export interface IMailProvider {
-  readonly providerId: 'gmail' | 'yahoo' | 'outlook';
+  readonly providerId: "gmail" | "yahoo" | "outlook";
   setupWatch(userId: string): Promise<void>;
   renewWatch(userId: string): Promise<void>;
   fetchNewEmails(userId: string, since: Date): Promise<RawEmail[]>;

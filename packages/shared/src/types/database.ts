@@ -3,101 +3,75 @@
 // ============================================================
 
 export const DOSSIER_TYPES = [
-  'purchase',
-  'trip',
-  'accommodation',
-  'subscription',
-  'reservation',
-  'other',
+  "purchase",
+  "travel",
+  "accommodation",
+  "subscription",
+  "booking",
+  "other",
 ] as const;
 export type DossierType = (typeof DOSSIER_TYPES)[number];
 
 export const DOSSIER_STATUSES = [
-  'detected',
-  'confirmed',
-  'in_progress',
-  'completed',
-  'cancelled',
-  'returned',
+  "detected",
+  "confirmed",
+  "in_progress",
+  "completed",
+  "cancelled",
+  "returned",
 ] as const;
 export type DossierStatus = (typeof DOSSIER_STATUSES)[number];
 
 export const EVENT_TYPES = [
-  'order_confirmation',
-  'payment_confirmation',
-  'shipping_notification',
-  'delivery_notification',
-  'invoice',
-  'return_confirmation',
-  'cancellation',
-  'booking_confirmation',
-  'booking_update',
-  'check_in_open',
-  'boarding_pass',
-  'accommodation_confirmation',
-  'host_message',
-  'accommodation_update',
-  'subscription_confirmation',
-  'subscription_renewal',
-  'subscription_cancellation',
-  'other',
+  "order_confirmation",
+  "payment_confirmation",
+  "shipping_notification",
+  "delivery_notification",
+  "invoice",
+  "return_confirmation",
+  "cancellation",
+  "booking_confirmation",
+  "booking_update",
+  "check_in_open",
+  "boarding_pass",
+  "accommodation_confirmation",
+  "host_message",
+  "accommodation_update",
+  "subscription_confirmation",
+  "subscription_renewal",
+  "subscription_cancellation",
+  "other",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
-export const MAIL_PROVIDERS = ['gmail', 'yahoo', 'outlook'] as const;
+export const MAIL_PROVIDERS = ["gmail", "yahoo", "outlook"] as const;
 export type MailProvider = (typeof MAIL_PROVIDERS)[number];
 
-export const BACKFILL_STATUSES = [
-  'idle',
-  'running',
-  'paused',
-  'done',
-  'error',
-] as const;
+export const BACKFILL_STATUSES = ["idle", "running", "paused", "done", "error"] as const;
 export type BackfillStatus = (typeof BACKFILL_STATUSES)[number];
 
-export const CLASSIFICATION_TYPES = [
-  'transactional',
-  'not_transactional',
-  'unprocessed',
-] as const;
+export const CLASSIFICATION_TYPES = ["transactional", "not_transactional", "unprocessed"] as const;
 export type ClassificationType = (typeof CLASSIFICATION_TYPES)[number];
 
-export const QUEUE_STATUSES = [
-  'pending',
-  'processing',
-  'done',
-  'error',
-  'skipped',
-] as const;
+export const QUEUE_STATUSES = ["pending", "processing", "done", "error", "skipped"] as const;
 export type QueueStatus = (typeof QUEUE_STATUSES)[number];
 
-export const LINKED_BY_TYPES = [
-  'reference',
-  'fuzzy_match',
-  'manual',
-  'llm',
-] as const;
+export const LINKED_BY_TYPES = ["reference", "fuzzy_match", "manual", "llm"] as const;
 export type LinkedByType = (typeof LINKED_BY_TYPES)[number];
 
-export const SUBSCRIPTION_PERIODS = [
-  'monthly',
-  'yearly',
-  'weekly',
-  'other',
-] as const;
+export const SUBSCRIPTION_PERIODS = ["monthly", "yearly", "weekly", "other"] as const;
 export type SubscriptionPeriod = (typeof SUBSCRIPTION_PERIODS)[number];
 
 export const MERCHANT_CATEGORIES = [
-  'ecommerce',
-  'travel',
-  'accommodation',
-  'subscription',
-  'restaurant',
-  'transport',
-  'culture',
-  'sport',
-  'other',
+  "ecommerce",
+  "travel",
+  "accommodation",
+  "subscription",
+  "restaurant",
+  "transport",
+  "culture",
+  "sport",
+  "other",
 ] as const;
 export type MerchantCategory = (typeof MERCHANT_CATEGORIES)[number];
 
@@ -106,13 +80,13 @@ export type MerchantCategory = (typeof MERCHANT_CATEGORIES)[number];
 // ============================================================
 
 export const ACTION_LINK_TYPES = [
-  'check_in',
-  'return_form',
-  'manage_booking',
-  'invoice',
-  'tracking',
-  'contact_host',
-  'cancel',
+  "check_in",
+  "return_form",
+  "manage_booking",
+  "invoice",
+  "tracking",
+  "contact_host",
+  "cancel",
 ] as const;
 export type ActionLinkType = (typeof ACTION_LINK_TYPES)[number];
 
@@ -321,56 +295,61 @@ export type StatusBadgeConfig = {
   iconName: string;
 };
 
-export const STATUS_BADGE_CONFIGS: Record<
-  DossierStatus,
-  Record<DossierType, StatusBadgeConfig>
-> = {
+export const STATUS_BADGE_CONFIGS: Record<DossierStatus, Record<DossierType, StatusBadgeConfig>> = {
   detected: {
-    purchase: { label: 'Détecté', colorVar: 'sesame-surface-muted', iconName: 'help-circle' },
-    trip: { label: 'Détecté', colorVar: 'sesame-surface-muted', iconName: 'help-circle' },
-    accommodation: { label: 'Détecté', colorVar: 'sesame-surface-muted', iconName: 'help-circle' },
-    subscription: { label: 'Détecté', colorVar: 'sesame-surface-muted', iconName: 'help-circle' },
-    reservation: { label: 'Détecté', colorVar: 'sesame-surface-muted', iconName: 'help-circle' },
-    other: { label: 'Détecté', colorVar: 'sesame-surface-muted', iconName: 'help-circle' },
+    purchase: { label: "Détecté", colorVar: "sesame-surface-muted", iconName: "help-circle" },
+    travel: { label: "Détecté", colorVar: "sesame-surface-muted", iconName: "help-circle" },
+    accommodation: { label: "Détecté", colorVar: "sesame-surface-muted", iconName: "help-circle" },
+    subscription: { label: "Détecté", colorVar: "sesame-surface-muted", iconName: "help-circle" },
+    booking: { label: "Détecté", colorVar: "sesame-surface-muted", iconName: "help-circle" },
+    other: { label: "Détecté", colorVar: "sesame-surface-muted", iconName: "help-circle" },
   },
   confirmed: {
-    purchase: { label: 'Commandé', colorVar: 'sesame-transit', iconName: 'shopping-cart-01' },
-    trip: { label: 'Réservé', colorVar: 'sesame-transit', iconName: 'plane-01' },
-    accommodation: { label: 'Réservé', colorVar: 'sesame-transit', iconName: 'home-04' },
-    subscription: { label: 'Actif', colorVar: 'sesame-transit', iconName: 'wifi-01' },
-    reservation: { label: 'Réservé', colorVar: 'sesame-transit', iconName: 'calendar-add-01' },
-    other: { label: 'Confirmé', colorVar: 'sesame-transit', iconName: 'checkmark-circle-02' },
+    purchase: { label: "Commandé", colorVar: "sesame-transit", iconName: "shopping-cart-01" },
+    travel: { label: "Réservé", colorVar: "sesame-transit", iconName: "plane-01" },
+    accommodation: { label: "Réservé", colorVar: "sesame-transit", iconName: "home-04" },
+    subscription: { label: "Actif", colorVar: "sesame-transit", iconName: "wifi-01" },
+    booking: { label: "Réservé", colorVar: "sesame-transit", iconName: "calendar-add-01" },
+    other: { label: "Confirmé", colorVar: "sesame-transit", iconName: "checkmark-circle-02" },
   },
   in_progress: {
-    purchase: { label: 'En route', colorVar: 'sesame-accent', iconName: 'truck-delivery' },
-    trip: { label: 'Check-in', colorVar: 'sesame-accent', iconName: 'plane-01' },
-    accommodation: { label: 'En cours', colorVar: 'sesame-accent', iconName: 'home-04' },
-    subscription: { label: 'En cours', colorVar: 'sesame-accent', iconName: 'wifi-01' },
-    reservation: { label: 'En cours', colorVar: 'sesame-accent', iconName: 'calendar-add-01' },
-    other: { label: 'En cours', colorVar: 'sesame-accent', iconName: 'loading-03' },
+    purchase: { label: "En route", colorVar: "sesame-accent", iconName: "truck-delivery" },
+    travel: { label: "Check-in", colorVar: "sesame-accent", iconName: "plane-01" },
+    accommodation: { label: "En cours", colorVar: "sesame-accent", iconName: "home-04" },
+    subscription: { label: "En cours", colorVar: "sesame-accent", iconName: "wifi-01" },
+    booking: { label: "En cours", colorVar: "sesame-accent", iconName: "calendar-add-01" },
+    other: { label: "En cours", colorVar: "sesame-accent", iconName: "loading-03" },
   },
   completed: {
-    purchase: { label: 'Livré', colorVar: 'sesame-positive', iconName: 'package-check' },
-    trip: { label: 'Terminé', colorVar: 'sesame-positive', iconName: 'checkmark-circle-02' },
-    accommodation: { label: 'Terminé', colorVar: 'sesame-positive', iconName: 'checkmark-circle-02' },
-    subscription: { label: 'Terminé', colorVar: 'sesame-positive', iconName: 'checkmark-circle-02' },
-    reservation: { label: 'Terminé', colorVar: 'sesame-positive', iconName: 'checkmark-circle-02' },
-    other: { label: 'Terminé', colorVar: 'sesame-positive', iconName: 'checkmark-circle-02' },
+    purchase: { label: "Livré", colorVar: "sesame-positive", iconName: "package-check" },
+    travel: { label: "Terminé", colorVar: "sesame-positive", iconName: "checkmark-circle-02" },
+    accommodation: {
+      label: "Terminé",
+      colorVar: "sesame-positive",
+      iconName: "checkmark-circle-02",
+    },
+    subscription: {
+      label: "Terminé",
+      colorVar: "sesame-positive",
+      iconName: "checkmark-circle-02",
+    },
+    booking: { label: "Terminé", colorVar: "sesame-positive", iconName: "checkmark-circle-02" },
+    other: { label: "Terminé", colorVar: "sesame-positive", iconName: "checkmark-circle-02" },
   },
   cancelled: {
-    purchase: { label: 'Annulé', colorVar: 'sesame-surface-muted', iconName: 'cancel-circle' },
-    trip: { label: 'Annulé', colorVar: 'sesame-surface-muted', iconName: 'cancel-circle' },
-    accommodation: { label: 'Annulé', colorVar: 'sesame-surface-muted', iconName: 'cancel-circle' },
-    subscription: { label: 'Annulé', colorVar: 'sesame-surface-muted', iconName: 'cancel-circle' },
-    reservation: { label: 'Annulé', colorVar: 'sesame-surface-muted', iconName: 'cancel-circle' },
-    other: { label: 'Annulé', colorVar: 'sesame-surface-muted', iconName: 'cancel-circle' },
+    purchase: { label: "Annulé", colorVar: "sesame-surface-muted", iconName: "cancel-circle" },
+    travel: { label: "Annulé", colorVar: "sesame-surface-muted", iconName: "cancel-circle" },
+    accommodation: { label: "Annulé", colorVar: "sesame-surface-muted", iconName: "cancel-circle" },
+    subscription: { label: "Annulé", colorVar: "sesame-surface-muted", iconName: "cancel-circle" },
+    booking: { label: "Annulé", colorVar: "sesame-surface-muted", iconName: "cancel-circle" },
+    other: { label: "Annulé", colorVar: "sesame-surface-muted", iconName: "cancel-circle" },
   },
   returned: {
-    purchase: { label: 'Retourné', colorVar: 'sesame-transit', iconName: 'undo' },
-    trip: { label: 'Retourné', colorVar: 'sesame-transit', iconName: 'undo' },
-    accommodation: { label: 'Retourné', colorVar: 'sesame-transit', iconName: 'undo' },
-    subscription: { label: 'Retourné', colorVar: 'sesame-transit', iconName: 'undo' },
-    reservation: { label: 'Retourné', colorVar: 'sesame-transit', iconName: 'undo' },
-    other: { label: 'Retourné', colorVar: 'sesame-transit', iconName: 'undo' },
+    purchase: { label: "Retourné", colorVar: "sesame-transit", iconName: "undo" },
+    travel: { label: "Retourné", colorVar: "sesame-transit", iconName: "undo" },
+    accommodation: { label: "Retourné", colorVar: "sesame-transit", iconName: "undo" },
+    subscription: { label: "Retourné", colorVar: "sesame-transit", iconName: "undo" },
+    booking: { label: "Retourné", colorVar: "sesame-transit", iconName: "undo" },
+    other: { label: "Retourné", colorVar: "sesame-transit", iconName: "undo" },
   },
 };

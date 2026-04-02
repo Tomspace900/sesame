@@ -1,17 +1,17 @@
-import { z } from 'zod';
+import { z } from "zod";
 import {
-  DOSSIER_TYPES,
-  DOSSIER_STATUSES,
-  EVENT_TYPES,
-  MAIL_PROVIDERS,
+  ACTION_LINK_TYPES,
   BACKFILL_STATUSES,
   CLASSIFICATION_TYPES,
-  QUEUE_STATUSES,
+  DOSSIER_STATUSES,
+  DOSSIER_TYPES,
+  EVENT_TYPES,
   LINKED_BY_TYPES,
-  SUBSCRIPTION_PERIODS,
+  MAIL_PROVIDERS,
   MERCHANT_CATEGORIES,
-  ACTION_LINK_TYPES,
-} from '../types/database.ts';
+  QUEUE_STATUSES,
+  SUBSCRIPTION_PERIODS,
+} from "../types/database.ts";
 
 export const DossierTypeSchema = z.enum(DOSSIER_TYPES);
 export const DossierStatusSchema = z.enum(DOSSIER_STATUSES);
@@ -124,7 +124,7 @@ export const DossierSchema = z.object({
   description: z.string().nullable(),
   reference: z.string().nullable(),
   amount: z.number().nullable(),
-  currency: z.string().default('EUR'),
+  currency: z.string().default("EUR"),
   status: DossierStatusSchema,
   image_url: z.string().url().nullable(),
   source_url: z.string().url().nullable(),
