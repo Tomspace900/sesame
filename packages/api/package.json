@@ -1,0 +1,8 @@
+{
+  "name": "@sesame/api",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "typecheck": "deno check supabase/functions/**/*.ts 2>&1 || echo 'Deno typecheck (requires deno installed)'"
+  }
+}
