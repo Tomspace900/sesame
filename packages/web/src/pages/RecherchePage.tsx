@@ -1,16 +1,16 @@
-import React, { useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
-import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { SectionTitle } from '@/components/ui/SectionTitle.tsx';
-import { DossierCard, type DossierCardData } from '@/components/dossiers/DossierCard.tsx';
-import { supabase } from '@/lib/supabase.ts';
-import { useAuthStore } from '@/stores/authStore.ts';
-import { useSearchStore } from '@/stores/searchStore.ts';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch.ts';
-import { cn } from '@/lib/utils.ts';
+import { DossierCard, type DossierCardData } from "@/components/dossiers/DossierCard.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { SectionTitle } from "@/components/ui/SectionTitle.tsx";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch.ts";
+import { supabase } from "@/lib/supabase.ts";
+import { cn } from "@/lib/utils.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import { useSearchStore } from "@/stores/searchStore.ts";
+import Cancel01Icon from "@hugeicons/core-free-icons/Cancel01Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import Search01Icon from "@hugeicons/core-free-icons/Search01Icon";
+import { useQuery } from "@tanstack/react-query";
+import React, { useEffect, useRef } from "react";
 
 export function RecherchePage(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
@@ -34,19 +34,19 @@ export function RecherchePage(): React.JSX.Element {
   };
 
   const { data: results, isLoading } = useQuery<DossierCardData[]>({
-    queryKey: ['recherche', user?.id, debouncedSearch],
+    queryKey: ["recherche", user?.id, debouncedSearch],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       if (!debouncedSearch.trim()) return [];
       const s = debouncedSearch.trim();
       const { data, error } = await supabase
-        .from('dossiers')
+        .from("dossiers")
         .select(
-          'id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name)',
+          "id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name)"
         )
-        .eq('user_id', user.id)
+        .eq("user_id", user.id)
         .or(`title.ilike.%${s}%,reference.ilike.%${s}%`)
-        .order('started_at', { ascending: false, nullsFirst: false })
+        .order("started_at", { ascending: false, nullsFirst: false })
         .limit(20);
       if (error) throw error;
       return (data ?? []) as unknown as DossierCardData[];
@@ -73,12 +73,12 @@ export function RecherchePage(): React.JSX.Element {
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Que cherches-tu ?"
             className={cn(
-              'w-full pl-10 pr-10 py-2.5',
-              'bg-sesame-surface border-2 border-sesame-text rounded',
-              'font-body text-sm text-sesame-text placeholder:text-sesame-text-muted',
-              'focus:outline-none focus:border-sesame-accent',
-              'focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2',
-              'transition-colors',
+              "w-full pl-10 pr-10 py-2.5",
+              "bg-sesame-surface border-2 border-sesame-text rounded",
+              "font-body text-sm text-sesame-text placeholder:text-sesame-text-muted",
+              "focus:outline-none focus:border-sesame-accent",
+              "focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2",
+              "transition-colors"
             )}
           />
           {hasSearch && (
@@ -127,7 +127,7 @@ export function RecherchePage(): React.JSX.Element {
         {showResults && results.length > 0 && (
           <div>
             <SectionTitle>
-              {results.length} résultat{results.length > 1 ? 's' : ''}
+              {results.length} résultat{results.length > 1 ? "s" : ""}
             </SectionTitle>
             <div className="bg-sesame-surface border-2 border-sesame-text rounded-lg overflow-hidden">
               {results.map((d) => (

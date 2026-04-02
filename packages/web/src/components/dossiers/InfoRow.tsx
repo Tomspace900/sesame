@@ -1,8 +1,8 @@
-import React from 'react';
-import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
-import SquareArrowUpRightIcon from '@hugeicons/core-free-icons/SquareArrowUpRightIcon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { toast } from 'sonner';
+import { Icon } from "@/components/ui/Icon.tsx";
+import Copy01Icon from "@hugeicons/core-free-icons/Copy01Icon";
+import SquareArrowUpRightIcon from "@hugeicons/core-free-icons/SquareArrowUpRightIcon";
+import React from "react";
+import { toast } from "sonner";
 
 type InfoRowProps = {
   label: string;
@@ -12,12 +12,18 @@ type InfoRowProps = {
   tel?: boolean;
 };
 
-export function InfoRow({ label, value, copiable, externalLink, tel }: InfoRowProps): React.JSX.Element | null {
+export function InfoRow({
+  label,
+  value,
+  copiable,
+  externalLink,
+  tel,
+}: InfoRowProps): React.JSX.Element | null {
   if (!value) return null;
 
   const handleCopy = () => {
     void navigator.clipboard.writeText(value);
-    toast.success('Référence copiée');
+    toast.success("Référence copiée");
   };
 
   return (

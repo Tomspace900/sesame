@@ -1,36 +1,36 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
-import FilterHorizontalIcon from '@hugeicons/core-free-icons/FilterHorizontalIcon';
-import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
-import DeliveryBox01Icon from '@hugeicons/core-free-icons/DeliveryBox01Icon';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { Button } from '@/components/ui/Button.tsx';
-import { SectionTitle } from '@/components/ui/SectionTitle.tsx';
-import { TextLink } from '@/components/ui/TextLink.tsx';
-import { DossierCard } from '@/components/dossiers/DossierCard.tsx';
-import { cn } from '@/lib/utils.ts';
-import { useDossierList, type FilterType, type FilterStatus } from './DossiersPage.hooks.ts';
+import { DossierCard } from "@/components/dossiers/DossierCard.tsx";
+import { Button } from "@/components/ui/Button.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { SectionTitle } from "@/components/ui/SectionTitle.tsx";
+import { TextLink } from "@/components/ui/TextLink.tsx";
+import { cn } from "@/lib/utils.ts";
+import Cancel01Icon from "@hugeicons/core-free-icons/Cancel01Icon";
+import DeliveryBox01Icon from "@hugeicons/core-free-icons/DeliveryBox01Icon";
+import FilterHorizontalIcon from "@hugeicons/core-free-icons/FilterHorizontalIcon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import Search01Icon from "@hugeicons/core-free-icons/Search01Icon";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useDossierList, type FilterStatus, type FilterType } from "./DossiersPage.hooks.ts";
 
 const TYPE_FILTER_LABELS: { value: FilterType; label: string }[] = [
-  { value: 'all', label: 'Tous' },
-  { value: 'purchase', label: 'Achats' },
-  { value: 'trip', label: 'Voyages' },
-  { value: 'accommodation', label: 'Hébergements' },
-  { value: 'subscription', label: 'Abonnements' },
-  { value: 'reservation', label: 'Réservations' },
-  { value: 'other', label: 'Autres' },
+  { value: "all", label: "Tous" },
+  { value: "purchase", label: "Achats" },
+  { value: "travel", label: "Voyages" },
+  { value: "accommodation", label: "Hébergements" },
+  { value: "subscription", label: "Abonnements" },
+  { value: "booking", label: "Réservations" },
+  { value: "other", label: "Autres" },
 ];
 
 const STATUS_FILTER_LABELS: { value: FilterStatus; label: string }[] = [
-  { value: 'all', label: 'Tous statuts' },
-  { value: 'detected', label: 'Détecté' },
-  { value: 'confirmed', label: 'Confirmé' },
-  { value: 'in_progress', label: 'En cours' },
-  { value: 'completed', label: 'Terminé' },
-  { value: 'cancelled', label: 'Annulé' },
-  { value: 'returned', label: 'Retourné' },
+  { value: "all", label: "Tous statuts" },
+  { value: "detected", label: "Détecté" },
+  { value: "confirmed", label: "Confirmé" },
+  { value: "in_progress", label: "En cours" },
+  { value: "completed", label: "Terminé" },
+  { value: "cancelled", label: "Annulé" },
+  { value: "returned", label: "Retourné" },
 ];
 
 export function DossiersPage(): React.JSX.Element {
@@ -68,17 +68,17 @@ export function DossiersPage(): React.JSX.Element {
             onChange={(e) => handleSearchChange(e.target.value)}
             placeholder="Rechercher un dossier..."
             className={cn(
-              'w-full pl-10 pr-10 py-2.5',
-              'bg-sesame-surface border-2 border-sesame-text rounded',
-              'font-body text-sm text-sesame-text placeholder:text-sesame-text-muted',
-              'focus:outline-none focus:border-sesame-accent',
-              'focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2',
-              'transition-colors',
+              "w-full pl-10 pr-10 py-2.5",
+              "bg-sesame-surface border-2 border-sesame-text rounded",
+              "font-body text-sm text-sesame-text placeholder:text-sesame-text-muted",
+              "focus:outline-none focus:border-sesame-accent",
+              "focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2",
+              "transition-colors"
             )}
           />
           {search && (
             <button
-              onClick={() => handleSearchChange('')}
+              onClick={() => handleSearchChange("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
               aria-label="Effacer la recherche"
             >
@@ -92,34 +92,34 @@ export function DossiersPage(): React.JSX.Element {
           <button
             onClick={() => setShowFilters((v) => !v)}
             className={cn(
-              'inline-flex items-center gap-1.5 px-3 py-1.5 rounded font-body text-xs font-medium',
-              'border border-sesame-text/30 transition-colors cursor-pointer',
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded font-body text-xs font-medium",
+              "border border-sesame-text/30 transition-colors cursor-pointer",
               showFilters
-                ? 'bg-sesame-text text-sesame-surface'
-                : 'bg-sesame-surface text-sesame-text hover:bg-sesame-surface-muted',
+                ? "bg-sesame-text text-sesame-surface"
+                : "bg-sesame-surface text-sesame-text hover:bg-sesame-surface-muted"
             )}
           >
             <Icon
               icon={FilterHorizontalIcon}
               size={14}
-              color={showFilters ? '#FCFAF5' : '#2A241F'}
+              color={showFilters ? "#FCFAF5" : "#2A241F"}
               aria-hidden
             />
             Filtres
           </button>
 
-          {typeFilter !== 'all' && (
+          {typeFilter !== "all" && (
             <FilterChip
               label={TYPE_FILTER_LABELS.find((t) => t.value === typeFilter)?.label ?? typeFilter}
-              onRemove={() => setTypeFilter('all')}
+              onRemove={() => setTypeFilter("all")}
             />
           )}
-          {statusFilter !== 'all' && (
+          {statusFilter !== "all" && (
             <FilterChip
               label={
                 STATUS_FILTER_LABELS.find((s) => s.value === statusFilter)?.label ?? statusFilter
               }
-              onRemove={() => setStatusFilter('all')}
+              onRemove={() => setStatusFilter("all")}
             />
           )}
         </div>
@@ -176,7 +176,13 @@ export function DossiersPage(): React.JSX.Element {
           </div>
         ) : groups.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-16 text-center">
-            <Icon icon={DeliveryBox01Icon} size={48} color="#7A7065" strokeWidth={1.5} aria-hidden />
+            <Icon
+              icon={DeliveryBox01Icon}
+              size={48}
+              color="#7A7065"
+              strokeWidth={1.5}
+              aria-hidden
+            />
             {hasActiveFilters ? (
               <>
                 <h2 className="font-heading font-semibold text-xl text-sesame-text">
@@ -194,7 +200,7 @@ export function DossiersPage(): React.JSX.Element {
                 <p className="text-sesame-text-muted font-body text-sm max-w-xs">
                   Lance l'import depuis Réglages pour importer tes mails.
                 </p>
-                <TextLink onClick={() => navigate('/reglages')} className="text-sesame-text">
+                <TextLink onClick={() => navigate("/reglages")} className="text-sesame-text">
                   Aller aux réglages
                 </TextLink>
               </>
@@ -220,7 +226,7 @@ export function DossiersPage(): React.JSX.Element {
                   onClick={() => setPage((p) => p + 1)}
                   disabled={isFetching}
                 >
-                  {isFetching ? 'Chargement...' : 'Charger plus'}
+                  {isFetching ? "Chargement..." : "Charger plus"}
                 </Button>
               </div>
             )}
@@ -241,7 +247,11 @@ function FilterChip({
   return (
     <span className="inline-flex items-center gap-1 px-2 py-1 rounded-pill bg-sesame-text text-sesame-surface font-body text-xs font-medium">
       {label}
-      <button onClick={onRemove} className="cursor-pointer" aria-label={`Retirer le filtre ${label}`}>
+      <button
+        onClick={onRemove}
+        className="cursor-pointer"
+        aria-label={`Retirer le filtre ${label}`}
+      >
         <Icon icon={Cancel01Icon} size={12} color="#FCFAF5" aria-hidden />
       </button>
     </span>
@@ -261,10 +271,10 @@ function FilterButton({
     <button
       onClick={onClick}
       className={cn(
-        'px-3 py-1 rounded-pill font-body text-xs font-medium border cursor-pointer transition-colors',
+        "px-3 py-1 rounded-pill font-body text-xs font-medium border cursor-pointer transition-colors",
         active
-          ? 'bg-sesame-text text-sesame-surface border-sesame-text'
-          : 'bg-sesame-surface text-sesame-text border-sesame-text/30 hover:border-sesame-text',
+          ? "bg-sesame-text text-sesame-surface border-sesame-text"
+          : "bg-sesame-surface text-sesame-text border-sesame-text/30 hover:border-sesame-text"
       )}
     >
       {label}

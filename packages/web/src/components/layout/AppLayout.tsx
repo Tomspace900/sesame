@@ -1,9 +1,9 @@
-import React from 'react';
-import { Outlet } from 'react-router-dom';
-import { Toaster } from 'sonner';
-import { Header } from './Header.tsx';
-import { BottomNav } from './BottomNav.tsx';
-import { BackfillBanner } from './BackfillBanner.tsx';
+import React from "react";
+import { Outlet } from "react-router-dom";
+import { Toaster } from "sonner";
+import { BackfillBanner } from "./BackfillBanner.tsx";
+import { BottomNav } from "./BottomNav.tsx";
+import { Header } from "./Header.tsx";
 
 export function AppLayout(): React.JSX.Element {
   return (
@@ -18,13 +18,13 @@ export function AppLayout(): React.JSX.Element {
         position="bottom-center"
         toastOptions={{
           style: {
-            background: '#FCFAF5',
-            border: '2px solid #2A241F',
-            boxShadow: '2px 2px 0px #2A241F',
-            borderRadius: '8px',
-            color: '#2A241F',
-            fontFamily: 'Plus Jakarta Sans, Outfit, sans-serif',
-            fontSize: '14px',
+            background: "#FCFAF5",
+            border: "2px solid #2A241F",
+            boxShadow: "2px 2px 0px #2A241F",
+            borderRadius: "8px",
+            color: "#2A241F",
+            fontFamily: "Plus Jakarta Sans, Outfit, sans-serif",
+            fontSize: "14px",
           },
         }}
       />

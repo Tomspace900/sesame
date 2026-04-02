@@ -1,15 +1,15 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import DeliveryBox01Icon from '@hugeicons/core-free-icons/DeliveryBox01Icon';
-import Airplane01Icon from '@hugeicons/core-free-icons/Airplane01Icon';
-import Home04Icon from '@hugeicons/core-free-icons/Home04Icon';
-import Wifi01Icon from '@hugeicons/core-free-icons/Wifi01Icon';
-import CalendarAdd01Icon from '@hugeicons/core-free-icons/CalendarAdd01Icon';
-import { Icon, type IconSvgElement } from '@/components/ui/Icon.tsx';
-import { StatusBadge } from '@/components/ui/StatusBadge.tsx';
-import { cn } from '@/lib/utils.ts';
-import { formatAmount, formatDate } from '@/lib/format.ts';
-import type { DossierStatus, DossierType } from '@sesame/shared/types';
+import { Icon, type IconSvgElement } from "@/components/ui/Icon.tsx";
+import { StatusBadge } from "@/components/ui/StatusBadge.tsx";
+import { formatAmount, formatDate } from "@/lib/format.ts";
+import { cn } from "@/lib/utils.ts";
+import Airplane01Icon from "@hugeicons/core-free-icons/Airplane01Icon";
+import CalendarAdd01Icon from "@hugeicons/core-free-icons/CalendarAdd01Icon";
+import DeliveryBox01Icon from "@hugeicons/core-free-icons/DeliveryBox01Icon";
+import Home04Icon from "@hugeicons/core-free-icons/Home04Icon";
+import Wifi01Icon from "@hugeicons/core-free-icons/Wifi01Icon";
+import type { DossierStatus, DossierType } from "@sesame/shared/types";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 export type DossierCardData = {
   id: string;
@@ -24,30 +24,30 @@ export type DossierCardData = {
 
 const TYPE_ICONS: Record<DossierType, IconSvgElement> = {
   purchase: DeliveryBox01Icon,
-  trip: Airplane01Icon,
+  travel: Airplane01Icon,
   accommodation: Home04Icon,
   subscription: Wifi01Icon,
-  reservation: CalendarAdd01Icon,
+  booking: CalendarAdd01Icon,
   other: DeliveryBox01Icon,
 };
 
 export type DossierCardProps = {
   dossier: DossierCardData;
-  variant?: 'standard' | 'compact';
+  variant?: "standard" | "compact";
   onClick?: () => void;
   className?: string;
 };
 
 export function DossierCard({
   dossier,
-  variant = 'standard',
+  variant = "standard",
   onClick,
   className,
 }: DossierCardProps): React.JSX.Element {
   const navigate = useNavigate();
   const handleClick = onClick ?? (() => navigate(`/dossiers/${dossier.id}`));
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === ' ') {
+    if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       handleClick();
     }
@@ -58,7 +58,7 @@ export function DossierCard({
   const formattedAmount = formatAmount(dossier.amount, dossier.currency);
   const formattedDate = formatDate(dossier.started_at);
 
-  if (variant === 'compact') {
+  if (variant === "compact") {
     return (
       <div
         role="button"
@@ -66,16 +66,16 @@ export function DossierCard({
         onClick={handleClick}
         onKeyDown={handleKeyDown}
         className={cn(
-          'flex items-center gap-2 py-3 px-1 cursor-pointer',
-          'border-b border-sesame-surface-muted',
-          'transition-colors hover:bg-sesame-surface-muted/40',
-          'focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2',
-          className,
+          "flex items-center gap-2 py-3 px-1 cursor-pointer",
+          "border-b border-sesame-surface-muted",
+          "transition-colors hover:bg-sesame-surface-muted/40",
+          "focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2",
+          className
         )}
       >
         {/* Titre — truncate, prend tout l'espace */}
         <p className="font-body font-medium text-sm text-sesame-text truncate flex-1 min-w-0">
-          {dossier.title ?? '(sans titre)'}
+          {dossier.title ?? "(sans titre)"}
         </p>
         {/* Source — masqué sur mobile si peu de place */}
         {merchant && (
@@ -90,7 +90,11 @@ export function DossierCard({
           </span>
         )}
         {/* Statut */}
-        <StatusBadge status={dossier.status} dossierType={dossier.dossier_type} className="shrink-0" />
+        <StatusBadge
+          status={dossier.status}
+          dossierType={dossier.dossier_type}
+          className="shrink-0"
+        />
       </div>
     );
   }
@@ -102,10 +106,10 @@ export function DossierCard({
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       className={cn(
-        'card-brutal',
-        'bg-sesame-surface border-2 border-sesame-text rounded-lg p-4 cursor-pointer',
-        'focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2',
-        className,
+        "card-brutal",
+        "bg-sesame-surface border-2 border-sesame-text rounded-lg p-4 cursor-pointer",
+        "focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2",
+        className
       )}
     >
       <div className="flex items-start gap-3">
@@ -120,7 +124,7 @@ export function DossierCard({
             <p className="font-body text-xs text-sesame-text-muted mb-0.5 truncate">{merchant}</p>
           )}
           <p className="font-body font-medium text-sm text-sesame-text leading-snug truncate">
-            {dossier.title ?? '(sans titre)'}
+            {dossier.title ?? "(sans titre)"}
           </p>
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <StatusBadge status={dossier.status} dossierType={dossier.dossier_type} />

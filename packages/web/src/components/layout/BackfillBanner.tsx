@@ -1,20 +1,20 @@
-import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase.ts';
-import { useAuthStore } from '@/stores/authStore.ts';
+import { supabase } from "@/lib/supabase.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import { useQuery } from "@tanstack/react-query";
+import React from "react";
 
 export function BackfillBanner(): React.JSX.Element | null {
   const user = useAuthStore((s) => s.user);
 
   const { data: runningAccount } = useQuery({
-    queryKey: ['backfill-status', user?.id],
+    queryKey: ["backfill-status", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data } = await supabase
-        .from('mail_accounts')
-        .select('id, email_address, backfill_status, backfill_progress')
-        .eq('user_id', user.id)
-        .eq('backfill_status', 'running')
+        .from("mail_accounts")
+        .select("id, email_address, backfill_status, backfill_progress")
+        .eq("user_id", user.id)
+        .eq("backfill_status", "running")
         .maybeSingle();
       return data;
     },
@@ -24,7 +24,10 @@ export function BackfillBanner(): React.JSX.Element | null {
 
   if (!runningAccount) return null;
 
-  const progress = runningAccount.backfill_progress as { processed: number; total: number | null } | null;
+  const progress = runningAccount.backfill_progress as {
+    processed: number;
+    total: number | null;
+  } | null;
   const processed = progress?.processed ?? 0;
   const total = progress?.total ?? null;
   const pct = total && total > 0 ? Math.round((processed / total) * 100) : null;

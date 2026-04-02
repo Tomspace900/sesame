@@ -1,5 +1,5 @@
-import React from 'react';
-import { cn } from '@/lib/utils.ts';
+import { cn } from "@/lib/utils.ts";
+import React from "react";
 
 export function SectionTitle({
   children,
@@ -11,8 +11,8 @@ export function SectionTitle({
   return (
     <p
       className={cn(
-        'font-body font-medium text-xs text-sesame-text-muted uppercase tracking-wider mb-3',
-        className,
+        "font-body font-medium text-xs text-sesame-text-muted uppercase tracking-wider mb-3",
+        className
       )}
     >
       {children}

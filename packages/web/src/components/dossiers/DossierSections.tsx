@@ -1,13 +1,13 @@
-import React from 'react';
-import Copy01Icon from '@hugeicons/core-free-icons/Copy01Icon';
-import SquareArrowUpRightIcon from '@hugeicons/core-free-icons/SquareArrowUpRightIcon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { SectionTitle } from '@/components/ui/SectionTitle.tsx';
-import { DeadlineBar } from '@/components/dossiers/DeadlineBar.tsx';
-import { InfoRow } from '@/components/dossiers/InfoRow.tsx';
-import { formatDateLong, formatDateTime, formatAmount, formatMonthYear } from '@/lib/format.ts';
-import { toast } from 'sonner';
-import type { DossierType, DossierStatus } from '@sesame/shared/types';
+import { DeadlineBar } from "@/components/dossiers/DeadlineBar.tsx";
+import { InfoRow } from "@/components/dossiers/InfoRow.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { SectionTitle } from "@/components/ui/SectionTitle.tsx";
+import { formatAmount, formatDateLong, formatDateTime, formatMonthYear } from "@/lib/format.ts";
+import Copy01Icon from "@hugeicons/core-free-icons/Copy01Icon";
+import SquareArrowUpRightIcon from "@hugeicons/core-free-icons/SquareArrowUpRightIcon";
+import type { DossierStatus, DossierType } from "@sesame/shared/types";
+import React from "react";
+import { toast } from "sonner";
 
 // ─── DossierDetail type ───────────────────────────────────────────────────────
 
@@ -91,7 +91,11 @@ export function PurchaseSections({ dossier }: SectionProps): React.JSX.Element {
             <InfoRow label="Transporteur" value={dossier.carrier} />
             <InfoRow label="N° de suivi" value={dossier.tracking_number} copiable />
             {dossier.tracking_url && (
-              <InfoRow label="Lien de suivi" value="Suivre mon colis" externalLink={dossier.tracking_url} />
+              <InfoRow
+                label="Lien de suivi"
+                value="Suivre mon colis"
+                externalLink={dossier.tracking_url}
+              />
             )}
           </div>
         </section>
@@ -112,8 +116,8 @@ export function PurchaseSections({ dossier }: SectionProps): React.JSX.Element {
                   </span>
                   <button
                     onClick={() => {
-                      void navigator.clipboard.writeText(dossier.pickup_code ?? '');
-                      toast.success('Code copié');
+                      void navigator.clipboard.writeText(dossier.pickup_code ?? "");
+                      toast.success("Code copié");
                     }}
                     className="cursor-pointer"
                     aria-label="Copier le code retrait"
@@ -132,7 +136,11 @@ export function PurchaseSections({ dossier }: SectionProps): React.JSX.Element {
           <SectionTitle>Échéances</SectionTitle>
           <div className="space-y-4 bg-sesame-surface border-2 border-sesame-text rounded-lg p-4">
             {dossier.return_deadline && (
-              <DeadlineBar label="Rétractation" deadline={dossier.return_deadline} startDate={dossier.started_at} />
+              <DeadlineBar
+                label="Rétractation"
+                deadline={dossier.return_deadline}
+                startDate={dossier.started_at}
+              />
             )}
             {dossier.warranty_deadline && (
               <DeadlineBar
@@ -152,7 +160,7 @@ export function PurchaseSections({ dossier }: SectionProps): React.JSX.Element {
 // ─── Trip ─────────────────────────────────────────────────────────────────────
 
 export function TripSections({ dossier }: SectionProps): React.JSX.Element {
-  const checkInLink = dossier.action_links?.find((l) => l.type === 'check_in');
+  const checkInLink = dossier.action_links?.find((l) => l.type === "check_in");
   const hasParticipants = dossier.participants && dossier.participants.length > 0;
 
   return (
@@ -175,7 +183,10 @@ export function TripSections({ dossier }: SectionProps): React.JSX.Element {
           <SectionTitle>Participants</SectionTitle>
           <div className="bg-sesame-surface border-2 border-sesame-text rounded-lg px-4">
             {dossier.participants.map((p, i) => (
-              <div key={i} className="py-2.5 font-body text-sm text-sesame-text border-b border-sesame-surface-muted last:border-0">
+              <div
+                key={i}
+                className="py-2.5 font-body text-sm text-sesame-text border-b border-sesame-surface-muted last:border-0"
+              >
                 {p}
               </div>
             ))}
@@ -199,7 +210,11 @@ export function TripSections({ dossier }: SectionProps): React.JSX.Element {
         <section>
           <SectionTitle>Échéances</SectionTitle>
           <div className="bg-sesame-surface border-2 border-sesame-text rounded-lg p-4">
-            <DeadlineBar label="Départ" deadline={dossier.departure_time} startDate={dossier.started_at} />
+            <DeadlineBar
+              label="Départ"
+              deadline={dossier.departure_time}
+              startDate={dossier.started_at}
+            />
           </div>
         </section>
       )}
@@ -246,7 +261,11 @@ export function AccommodationSections({ dossier }: SectionProps): React.JSX.Elem
         <section>
           <SectionTitle>Échéances</SectionTitle>
           <div className="bg-sesame-surface border-2 border-sesame-text rounded-lg p-4">
-            <DeadlineBar label="Annulation gratuite" deadline={dossier.return_deadline} startDate={dossier.started_at} />
+            <DeadlineBar
+              label="Annulation gratuite"
+              deadline={dossier.return_deadline}
+              startDate={dossier.started_at}
+            />
           </div>
         </section>
       )}
@@ -257,10 +276,10 @@ export function AccommodationSections({ dossier }: SectionProps): React.JSX.Elem
 // ─── Subscription ─────────────────────────────────────────────────────────────
 
 const PERIOD_LABELS: Record<string, string> = {
-  monthly: 'Mensuel',
-  yearly: 'Annuel',
-  weekly: 'Hebdomadaire',
-  other: 'Autre',
+  monthly: "Mensuel",
+  yearly: "Annuel",
+  weekly: "Hebdomadaire",
+  other: "Autre",
 };
 
 export function SubscriptionSections({ dossier }: SectionProps): React.JSX.Element {
@@ -273,7 +292,7 @@ export function SubscriptionSections({ dossier }: SectionProps): React.JSX.Eleme
           {dossier.subscription_amount && (
             <InfoRow
               label="Montant"
-              value={formatAmount(dossier.subscription_amount, dossier.currency) ?? ''}
+              value={formatAmount(dossier.subscription_amount, dossier.currency) ?? ""}
             />
           )}
           {dossier.subscription_period && (
@@ -282,7 +301,10 @@ export function SubscriptionSections({ dossier }: SectionProps): React.JSX.Eleme
               value={PERIOD_LABELS[dossier.subscription_period] ?? dossier.subscription_period}
             />
           )}
-          <InfoRow label="Prochain renouvellement" value={formatDateLong(dossier.next_renewal_at)} />
+          <InfoRow
+            label="Prochain renouvellement"
+            value={formatDateLong(dossier.next_renewal_at)}
+          />
         </div>
       </section>
 
@@ -290,7 +312,11 @@ export function SubscriptionSections({ dossier }: SectionProps): React.JSX.Eleme
         <section>
           <SectionTitle>Échéances</SectionTitle>
           <div className="bg-sesame-surface border-2 border-sesame-text rounded-lg p-4">
-            <DeadlineBar label="Renouvellement" deadline={dossier.next_renewal_at} startDate={dossier.started_at} />
+            <DeadlineBar
+              label="Renouvellement"
+              deadline={dossier.next_renewal_at}
+              startDate={dossier.started_at}
+            />
           </div>
         </section>
       )}
@@ -310,7 +336,11 @@ export function ReservationSections({ dossier }: SectionProps): React.JSX.Elemen
         {dossier.number_of_guests && (
           <InfoRow label="Personnes" value={`${dossier.number_of_guests} personnes`} />
         )}
-        <InfoRow label="Référence" value={dossier.booking_reference ?? dossier.reference} copiable />
+        <InfoRow
+          label="Référence"
+          value={dossier.booking_reference ?? dossier.reference}
+          copiable
+        />
       </div>
     </section>
   );

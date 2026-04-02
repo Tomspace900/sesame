@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useDebouncedSearch(delay = 300) {
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSearchChange = useCallback(
@@ -11,7 +11,7 @@ export function useDebouncedSearch(delay = 300) {
       if (timerRef.current) clearTimeout(timerRef.current);
       timerRef.current = setTimeout(() => setDebouncedSearch(value), delay);
     },
-    [delay],
+    [delay]
   );
 
   const setSearchImmediate = useCallback((value: string) => {
@@ -22,8 +22,8 @@ export function useDebouncedSearch(delay = 300) {
 
   const clearSearch = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setSearch('');
-    setDebouncedSearch('');
+    setSearch("");
+    setDebouncedSearch("");
   }, []);
 
   useEffect(() => {

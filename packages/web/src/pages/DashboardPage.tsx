@@ -1,22 +1,18 @@
-import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { cn } from '@/lib/utils.ts';
-import DeliveryBox01Icon from '@hugeicons/core-free-icons/DeliveryBox01Icon';
-import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
-import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { Button } from '@/components/ui/Button.tsx';
-import { SectionTitle } from '@/components/ui/SectionTitle.tsx';
-import { DossierCard, type DossierCardData } from '@/components/dossiers/DossierCard.tsx';
-import { supabase } from '@/lib/supabase.ts';
-import { useAuthStore } from '@/stores/authStore.ts';
-import {
-  buildAlerts,
-  type DossierWithDeadline,
-  type AlertData,
-} from './DashboardPage.utils.ts';
+import { DossierCard, type DossierCardData } from "@/components/dossiers/DossierCard.tsx";
+import { Button } from "@/components/ui/Button.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { SectionTitle } from "@/components/ui/SectionTitle.tsx";
+import { supabase } from "@/lib/supabase.ts";
+import { cn } from "@/lib/utils.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import Alert02Icon from "@hugeicons/core-free-icons/Alert02Icon";
+import Cancel01Icon from "@hugeicons/core-free-icons/Cancel01Icon";
+import DeliveryBox01Icon from "@hugeicons/core-free-icons/DeliveryBox01Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import { useQuery } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { buildAlerts, type AlertData, type DossierWithDeadline } from "./DashboardPage.utils.ts";
 
 export function DashboardPage(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
@@ -24,22 +20,22 @@ export function DashboardPage(): React.JSX.Element {
   const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
 
   const firstName =
-    (user?.user_metadata?.['display_name'] as string | undefined) ??
-    user?.email?.split('@')[0] ??
-    'toi';
+    (user?.user_metadata?.["display_name"] as string | undefined) ??
+    user?.email?.split("@")[0] ??
+    "toi";
 
   const { data: inProgressDossiers, isLoading: loadingInProgress } = useQuery<DossierCardData[]>({
-    queryKey: ['dossiers', 'in_progress', user?.id],
+    queryKey: ["dossiers", "in_progress", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
-        .from('dossiers')
+        .from("dossiers")
         .select(
-          'id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name)',
+          "id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name)"
         )
-        .eq('user_id', user.id)
-        .in('status', ['confirmed', 'in_progress'])
-        .order('started_at', { ascending: false })
+        .eq("user_id", user.id)
+        .in("status", ["confirmed", "in_progress"])
+        .order("started_at", { ascending: false })
         .limit(5);
       if (error) throw error;
       return (data ?? []) as unknown as DossierCardData[];
@@ -48,16 +44,16 @@ export function DashboardPage(): React.JSX.Element {
   });
 
   const { data: recentDossiers, isLoading: loadingRecent } = useQuery<DossierCardData[]>({
-    queryKey: ['dossiers', 'recent', user?.id],
+    queryKey: ["dossiers", "recent", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
-        .from('dossiers')
+        .from("dossiers")
         .select(
-          'id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name)',
+          "id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name)"
         )
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
       return (data ?? []) as unknown as DossierCardData[];
@@ -66,20 +62,20 @@ export function DashboardPage(): React.JSX.Element {
   });
 
   const { data: deadlineDossiers } = useQuery<DossierWithDeadline[]>({
-    queryKey: ['dossiers', 'deadlines', user?.id],
+    queryKey: ["dossiers", "deadlines", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const now = new Date().toISOString();
       const limit = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
-        .from('dossiers')
+        .from("dossiers")
         .select(
-          'id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name), return_deadline, warranty_deadline, next_renewal_at',
+          "id, dossier_type, title, status, amount, currency, started_at, merchants(canonical_name), return_deadline, warranty_deadline, next_renewal_at"
         )
-        .eq('user_id', user.id)
+        .eq("user_id", user.id)
         .or(`return_deadline.gte.${now},warranty_deadline.gte.${now},next_renewal_at.gte.${now}`)
         .or(
-          `return_deadline.lte.${limit},warranty_deadline.lte.${limit},next_renewal_at.lte.${limit}`,
+          `return_deadline.lte.${limit},warranty_deadline.lte.${limit},next_renewal_at.lte.${limit}`
         );
       if (error) throw error;
       return (data ?? []) as unknown as DossierWithDeadline[];
@@ -89,7 +85,7 @@ export function DashboardPage(): React.JSX.Element {
 
   const allAlerts = deadlineDossiers ? buildAlerts(deadlineDossiers) : [];
   const alerts = allAlerts.filter(
-    (a) => !dismissedAlerts.has(`${a.dossier.id}-${a.deadline.getTime()}`),
+    (a) => !dismissedAlerts.has(`${a.dossier.id}-${a.deadline.getTime()}`)
   );
   const isLoading = loadingInProgress || loadingRecent;
   const hasAnyDossier =
@@ -112,9 +108,7 @@ export function DashboardPage(): React.JSX.Element {
 
   return (
     <div className="px-4 py-6 max-w-2xl mx-auto space-y-8">
-      <h1 className="font-heading font-semibold text-2xl text-sesame-text">
-        Bonjour, {firstName}
-      </h1>
+      <h1 className="font-heading font-semibold text-2xl text-sesame-text">Bonjour, {firstName}</h1>
 
       {!hasAnyDossier && (
         <div className="flex flex-col items-center gap-4 py-12 text-center">
@@ -125,7 +119,7 @@ export function DashboardPage(): React.JSX.Element {
           <p className="text-sesame-text-muted font-body text-sm max-w-xs">
             Connecte ta boîte mail pour réveiller Sésame.
           </p>
-          <Button variant="primary" onClick={() => navigate('/reglages')}>
+          <Button variant="primary" onClick={() => navigate("/reglages")}>
             Connecter ma boîte mail
           </Button>
         </div>
@@ -142,9 +136,7 @@ export function DashboardPage(): React.JSX.Element {
                   key={alertKey}
                   alert={alert}
                   onNavigate={() => navigate(`/dossiers/${alert.dossier.id}`)}
-                  onDismiss={() =>
-                    setDismissedAlerts((prev) => new Set([...prev, alertKey]))
-                  }
+                  onDismiss={() => setDismissedAlerts((prev) => new Set([...prev, alertKey]))}
                 />
               );
             })}
@@ -157,7 +149,7 @@ export function DashboardPage(): React.JSX.Element {
           <div className="flex items-center justify-between mb-3">
             <SectionTitle className="mb-0">En cours</SectionTitle>
             <button
-              onClick={() => navigate('/dossiers?status=in_progress')}
+              onClick={() => navigate("/dossiers?status=in_progress")}
               className="font-body text-xs text-sesame-text-muted underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 hover:opacity-70 transition-opacity"
             >
               Voir tout
@@ -180,7 +172,7 @@ export function DashboardPage(): React.JSX.Element {
             ))}
           </div>
           <button
-            onClick={() => navigate('/dossiers')}
+            onClick={() => navigate("/dossiers")}
             className="mt-3 w-full font-body text-sm text-sesame-text-muted text-right underline underline-offset-2 cursor-pointer bg-transparent border-none p-0 block hover:opacity-70 transition-opacity"
           >
             Voir tous les dossiers
@@ -203,8 +195,8 @@ function AlertCard({
   return (
     <div
       className={cn(
-        'relative bg-sesame-surface border-2 border-sesame-text rounded-lg overflow-hidden border-l-4',
-        alert.urgent ? 'border-l-sesame-danger' : 'border-l-sesame-accent',
+        "relative bg-sesame-surface border-2 border-sesame-text rounded-lg overflow-hidden border-l-4",
+        alert.urgent ? "border-l-sesame-danger" : "border-l-sesame-accent"
       )}
     >
       <button
@@ -215,7 +207,7 @@ function AlertCard({
           <Icon
             icon={Alert02Icon}
             size={18}
-            color={alert.urgent ? 'var(--color-sesame-danger)' : 'var(--color-sesame-accent)'}
+            color={alert.urgent ? "var(--color-sesame-danger)" : "var(--color-sesame-accent)"}
             aria-hidden
           />
           <p className="font-body text-sm text-sesame-text leading-snug">{alert.label}</p>

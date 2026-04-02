@@ -1,29 +1,29 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import * as Switch from '@radix-ui/react-switch';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
-import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
-import Add01Icon from '@hugeicons/core-free-icons/Add01Icon';
-import { supabase } from '@/lib/supabase.ts';
-import { Button } from '@/components/ui/Button.tsx';
-import { Input } from '@/components/ui/Input.tsx';
-import { Label } from '@/components/ui/Label.tsx';
-import { Progress } from '@/components/ui/Progress.tsx';
-import { SectionTitle } from '@/components/ui/SectionTitle.tsx';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { DisconnectMailDialog } from '@/components/ui/DisconnectMailDialog.tsx';
-import { formatAmount, formatRelativeTime } from '@/lib/format.ts';
+import { Button } from "@/components/ui/Button.tsx";
+import { DisconnectMailDialog } from "@/components/ui/DisconnectMailDialog.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { Input } from "@/components/ui/Input.tsx";
+import { Label } from "@/components/ui/Label.tsx";
+import { Progress } from "@/components/ui/Progress.tsx";
+import { SectionTitle } from "@/components/ui/SectionTitle.tsx";
+import { formatAmount, formatRelativeTime } from "@/lib/format.ts";
+import { supabase } from "@/lib/supabase.ts";
+import Add01Icon from "@hugeicons/core-free-icons/Add01Icon";
+import Alert02Icon from "@hugeicons/core-free-icons/Alert02Icon";
+import CheckmarkCircle02Icon from "@hugeicons/core-free-icons/CheckmarkCircle02Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import * as Switch from "@radix-ui/react-switch";
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  useReglagesProfile,
-  useMailAccounts,
-  useStats,
   DEFAULT_PREFS,
+  useMailAccounts,
+  useReglagesProfile,
+  useStats,
   type MailAccount,
   type NotificationPreferences,
-} from './ReglagesPage.hooks.ts';
+} from "./ReglagesPage.hooks.ts";
 
-const TELEGRAM_BOT_NAME = import.meta.env['VITE_TELEGRAM_BOT_NAME'] as string | undefined;
+const TELEGRAM_BOT_NAME = import.meta.env["VITE_TELEGRAM_BOT_NAME"] as string | undefined;
 
 // ============================================================
 // Mon compte
@@ -64,7 +64,7 @@ function MonCompteSection({
               onChange={(e) => setName(e.target.value)}
               onBlur={handleSave}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave();
+                if (e.key === "Enter") handleSave();
               }}
               placeholder="Ton prénom ou pseudo"
               className="flex-1"
@@ -84,7 +84,7 @@ function MonCompteSection({
           <p className="font-body text-xs text-sesame-text-muted uppercase tracking-wide mb-0.5">
             Email
           </p>
-          <p className="font-body text-sm text-sesame-text-muted">{email ?? '—'}</p>
+          <p className="font-body text-sm text-sesame-text-muted">{email ?? "—"}</p>
         </div>
         <button
           onClick={onSignOut}
@@ -160,18 +160,18 @@ function BoitesMailSection({
                       aria-hidden
                     />
                   ) : (
-                    'Déconnecter'
+                    "Déconnecter"
                   )}
                 </button>
               </div>
 
-              {account.backfill_status === 'running' && account.backfill_progress && (
+              {account.backfill_status === "running" && account.backfill_progress && (
                 <div className="space-y-1.5">
                   <div className="flex justify-between">
                     <p className="font-body text-xs text-sesame-text-muted">Import en cours...</p>
                     {total !== null && (
                       <p className="font-body text-xs text-sesame-text-muted">
-                        {processed.toLocaleString('fr-FR')}/{total.toLocaleString('fr-FR')}
+                        {processed.toLocaleString("fr-FR")}/{total.toLocaleString("fr-FR")}
                       </p>
                     )}
                   </div>
@@ -196,7 +196,7 @@ function BoitesMailSection({
         onOpenChange={(open) => {
           if (!open) setConfirmId(null);
         }}
-        emailAddress={confirmAccount?.email_address ?? ''}
+        emailAddress={confirmAccount?.email_address ?? ""}
         onConfirm={() => {
           if (confirmAccount) {
             disconnectAccount(confirmAccount.id);
@@ -243,7 +243,7 @@ function TelegramSection({
   isSendingTest,
   disconnectTelegram,
 }: TelegramSectionProps): React.JSX.Element {
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState("");
 
   const handleVerify = () => {
     const trimmed = code.trim();
@@ -293,7 +293,7 @@ function TelegramSection({
               text={
                 TELEGRAM_BOT_NAME
                   ? `Ouvre Telegram et cherche @${TELEGRAM_BOT_NAME}`
-                  : 'Ouvre Telegram et cherche le bot Sésame'
+                  : "Ouvre Telegram et cherche le bot Sésame"
               }
             />
             <TelegramStep n={2} text="Envoie /start au bot" />
@@ -312,7 +312,7 @@ function TelegramSection({
               value={code}
               onChange={(e) => setCode(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleVerify();
+                if (e.key === "Enter") handleVerify();
               }}
               placeholder="Code à 6 chiffres"
               className="flex-1"
@@ -421,7 +421,7 @@ type NotificationsSectionProps = {
   prefs: NotificationPreferences;
   updatePref: <K extends keyof NotificationPreferences>(
     key: K,
-    value: NotificationPreferences[K],
+    value: NotificationPreferences[K]
   ) => void;
   isSavingPrefs: boolean;
 };
@@ -450,32 +450,32 @@ function NotificationsSection({
           id="notif-telegram"
           label="Telegram"
           checked={prefs.telegram}
-          onChange={(v) => updatePref('telegram', v)}
+          onChange={(v) => updatePref("telegram", v)}
         />
         <SwitchRow
           id="notif-calendar"
           label="Google Calendar"
           checked={prefs.calendar}
-          onChange={(v) => updatePref('calendar', v)}
+          onChange={(v) => updatePref("calendar", v)}
         />
         <div className="border-t-2 border-sesame-text/10 pt-4 space-y-3">
           <DelayInput
             id="delay-return"
             label="Rappel rétractation (jours avant)"
             value={prefs.return_reminder_days}
-            onChange={(v) => updatePref('return_reminder_days', v)}
+            onChange={(v) => updatePref("return_reminder_days", v)}
           />
           <DelayInput
             id="delay-warranty"
             label="Rappel garantie (jours avant)"
             value={prefs.warranty_reminder_days}
-            onChange={(v) => updatePref('warranty_reminder_days', v)}
+            onChange={(v) => updatePref("warranty_reminder_days", v)}
           />
           <DelayInput
             id="delay-renewal"
             label="Rappel renouvellement (jours avant)"
             value={prefs.renewal_reminder_days}
-            onChange={(v) => updatePref('renewal_reminder_days', v)}
+            onChange={(v) => updatePref("renewal_reminder_days", v)}
           />
         </div>
       </div>
@@ -513,10 +513,10 @@ function StatistiquesSection({
     <section>
       <SectionTitle>Statistiques</SectionTitle>
       <div className="grid grid-cols-2 gap-3">
-        <StatCard value={dossierCount.toLocaleString('fr-FR')} label="Dossiers" />
-        <StatCard value={mailsAnalysed.toLocaleString('fr-FR')} label="Mails analysés" />
-        <StatCard value={sourceCount.toLocaleString('fr-FR')} label="Sources" />
-        <StatCard value={formatAmount(totalValue, 'EUR') ?? '—'} label="Valeur totale" />
+        <StatCard value={dossierCount.toLocaleString("fr-FR")} label="Dossiers" />
+        <StatCard value={mailsAnalysed.toLocaleString("fr-FR")} label="Mails analysés" />
+        <StatCard value={sourceCount.toLocaleString("fr-FR")} label="Sources" />
+        <StatCard value={formatAmount(totalValue, "EUR") ?? "—"} label="Valeur totale" />
       </div>
     </section>
   );
@@ -547,13 +547,13 @@ export function ReglagesPage(): React.JSX.Element {
   const { accounts, disconnectAccount, isDisconnecting, disconnectingId } = useMailAccounts();
   const { dossierCount, mailsAnalysed, sourceCount, totalValue } = useStats();
 
-  const emailPrefix = user?.email?.split('@')[0] ?? '';
+  const emailPrefix = user?.email?.split("@")[0] ?? "";
   const displayName = profile?.display_name ?? emailPrefix;
   const prefs = profile?.notification_preferences ?? DEFAULT_PREFS;
 
   const handleSignOut = () => {
     void supabase.auth.signOut().then(() => {
-      navigate('/auth/connexion');
+      navigate("/auth/connexion");
     });
   };
 
@@ -562,7 +562,7 @@ export function ReglagesPage(): React.JSX.Element {
       <h1 className="font-heading font-semibold text-2xl text-sesame-text">Réglages</h1>
 
       <MonCompteSection
-        key={displayName || 'init'}
+        key={displayName || "init"}
         displayName={displayName}
         email={user?.email}
         isSavingName={isSavingName}
@@ -575,7 +575,7 @@ export function ReglagesPage(): React.JSX.Element {
         disconnectAccount={disconnectAccount}
         isDisconnecting={isDisconnecting}
         disconnectingId={disconnectingId}
-        onAddAccount={() => navigate('/reglages/connecter/gmail')}
+        onAddAccount={() => navigate("/reglages/connecter/gmail")}
       />
 
       <TelegramSection

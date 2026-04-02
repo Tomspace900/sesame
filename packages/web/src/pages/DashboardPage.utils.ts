@@ -1,4 +1,4 @@
-import type { DossierCardData } from '@/components/dossiers/DossierCard.tsx';
+import type { DossierCardData } from "@/components/dossiers/DossierCard.tsx";
 
 export type DossierWithDeadline = DossierCardData & {
   return_deadline: string | null;
@@ -29,20 +29,19 @@ export function buildAlerts(dossiers: DossierWithDeadline[]): AlertData[] {
         field: d.return_deadline,
         label: (days) =>
           days <= 3
-            ? `Dernier appel : ${days}j pour renvoyer ${d.title ?? 'cet article'}`
-            : `Tu peux encore renvoyer ${d.title ?? 'cet article'} — dans ${days} jours`,
+            ? `Dernier appel : ${days}j pour renvoyer ${d.title ?? "cet article"}`
+            : `Tu peux encore renvoyer ${d.title ?? "cet article"} — dans ${days} jours`,
       },
       {
         field: d.warranty_deadline,
         label: (days) =>
           days <= 3
-            ? `Garantie de ${d.title ?? 'ce produit'} expire dans ${days} jours`
-            : `Ta garantie pour ${d.title ?? 'ce produit'} expire bientôt`,
+            ? `Garantie de ${d.title ?? "ce produit"} expire dans ${days} jours`
+            : `Ta garantie pour ${d.title ?? "ce produit"} expire bientôt`,
       },
       {
         field: d.next_renewal_at,
-        label: (days) =>
-          `Ton abonnement ${d.title ?? ''} se renouvelle dans ${days} jours`.trim(),
+        label: (days) => `Ton abonnement ${d.title ?? ""} se renouvelle dans ${days} jours`.trim(),
       },
     ];
 

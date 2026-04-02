@@ -1,18 +1,18 @@
-import React, { useState } from 'react';
-import * as Dialog from '@radix-ui/react-dialog';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Cancel01Icon from '@hugeicons/core-free-icons/Cancel01Icon';
-import Search01Icon from '@hugeicons/core-free-icons/Search01Icon';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { StatusBadge } from '@/components/ui/StatusBadge.tsx';
-import { supabase } from '@/lib/supabase.ts';
-import { useAuthStore } from '@/stores/authStore.ts';
-import { useDebouncedSearch } from '@/hooks/useDebouncedSearch.ts';
-import { cn } from '@/lib/utils.ts';
-import { formatAmount, formatDate } from '@/lib/format.ts';
-import { toast } from 'sonner';
-import type { DossierType, DossierStatus } from '@sesame/shared/types';
+import { Icon } from "@/components/ui/Icon.tsx";
+import { StatusBadge } from "@/components/ui/StatusBadge.tsx";
+import { useDebouncedSearch } from "@/hooks/useDebouncedSearch.ts";
+import { formatAmount, formatDate } from "@/lib/format.ts";
+import { supabase } from "@/lib/supabase.ts";
+import { cn } from "@/lib/utils.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import Cancel01Icon from "@hugeicons/core-free-icons/Cancel01Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import Search01Icon from "@hugeicons/core-free-icons/Search01Icon";
+import * as Dialog from "@radix-ui/react-dialog";
+import type { DossierStatus, DossierType } from "@sesame/shared/types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useState } from "react";
+import { toast } from "sonner";
 
 type Candidate = {
   id: string;
@@ -47,21 +47,21 @@ export function ManualLinkModal({
   const { search, debouncedSearch, handleSearchChange } = useDebouncedSearch();
 
   const { data: candidates = [], isLoading } = useQuery<Candidate[]>({
-    queryKey: ['manual-link-candidates', user?.id, dossierId, debouncedSearch],
+    queryKey: ["manual-link-candidates", user?.id, dossierId, debouncedSearch],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       let q = supabase
-        .from('dossiers')
+        .from("dossiers")
         .select(
-          'id, title, dossier_type, status, amount, currency, started_at, merchants(canonical_name)',
+          "id, title, dossier_type, status, amount, currency, started_at, merchants(canonical_name)"
         )
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
         .limit(10);
 
       if (debouncedSearch.trim()) {
         q = q.or(
-          `title.ilike.%${debouncedSearch.trim()}%,reference.ilike.%${debouncedSearch.trim()}%`,
+          `title.ilike.%${debouncedSearch.trim()}%,reference.ilike.%${debouncedSearch.trim()}%`
         );
       }
 
@@ -76,28 +76,25 @@ export function ManualLinkModal({
     mutationFn: async () => {
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
-      if (!token) throw new Error('Non authentifié');
+      if (!token) throw new Error("Non authentifié");
 
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manual-link`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ event_id: eventId, dossier_id: selectedId }),
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manual-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ event_id: eventId, dossier_id: selectedId }),
+      });
       const json = (await res.json()) as { success: boolean; error?: string };
-      if (!json.success) throw new Error(json.error ?? 'Erreur inconnue');
+      if (!json.success) throw new Error(json.error ?? "Erreur inconnue");
       return json;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['dossier', dossierId] });
-      void queryClient.invalidateQueries({ queryKey: ['dossier_events', dossierId] });
-      void queryClient.invalidateQueries({ queryKey: ['dossiers'] });
-      toast.success('Dossier lié');
+      void queryClient.invalidateQueries({ queryKey: ["dossier", dossierId] });
+      void queryClient.invalidateQueries({ queryKey: ["dossier_events", dossierId] });
+      void queryClient.invalidateQueries({ queryKey: ["dossiers"] });
+      toast.success("Dossier lié");
       onClose();
     },
     onError: (err) => {
@@ -111,11 +108,11 @@ export function ManualLinkModal({
         <Dialog.Overlay className="fixed inset-0 z-50 bg-sesame-text/40" />
         <Dialog.Content
           className={cn(
-            'fixed z-50 bg-sesame-surface border-2 border-sesame-text rounded-xl shadow-brutal',
-            'bottom-0 left-0 right-0 sm:bottom-auto sm:top-1/2 sm:left-1/2',
-            'sm:-translate-x-1/2 sm:-translate-y-1/2',
-            'w-full sm:max-w-md',
-            'max-h-[85vh] flex flex-col',
+            "fixed z-50 bg-sesame-surface border-2 border-sesame-text rounded-xl shadow-brutal",
+            "bottom-0 left-0 right-0 sm:bottom-auto sm:top-1/2 sm:left-1/2",
+            "sm:-translate-x-1/2 sm:-translate-y-1/2",
+            "w-full sm:max-w-md",
+            "max-h-[85vh] flex flex-col"
           )}
         >
           <div className="flex items-center justify-between p-5 border-b border-sesame-surface-muted">
@@ -146,11 +143,11 @@ export function ManualLinkModal({
                 onChange={(e) => handleSearchChange(e.target.value)}
                 placeholder="Chercher un autre dossier..."
                 className={cn(
-                  'w-full pl-9 pr-4 py-2',
-                  'bg-sesame-bg border border-sesame-text/30 rounded',
-                  'font-body text-sm text-sesame-text placeholder:text-sesame-text-muted',
-                  'focus:outline-none focus:border-sesame-accent transition-colors',
-                  'focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2',
+                  "w-full pl-9 pr-4 py-2",
+                  "bg-sesame-bg border border-sesame-text/30 rounded",
+                  "font-body text-sm text-sesame-text placeholder:text-sesame-text-muted",
+                  "focus:outline-none focus:border-sesame-accent transition-colors",
+                  "focus-visible:outline-2 focus-visible:outline-sesame-accent focus-visible:outline-offset-2"
                 )}
               />
             </div>
@@ -177,16 +174,16 @@ export function ManualLinkModal({
                   key={c.id}
                   onClick={() => setSelectedId(c.id)}
                   className={cn(
-                    'w-full text-left p-3 rounded-lg border-2 cursor-pointer transition-colors',
+                    "w-full text-left p-3 rounded-lg border-2 cursor-pointer transition-colors",
                     selectedId === c.id
-                      ? 'border-sesame-accent bg-sesame-accent/5'
-                      : 'border-sesame-text/20 bg-sesame-surface hover:border-sesame-text/40',
+                      ? "border-sesame-accent bg-sesame-accent/5"
+                      : "border-sesame-text/20 bg-sesame-surface hover:border-sesame-text/40"
                   )}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-body font-medium text-sm text-sesame-text truncate">
-                        {c.title ?? '(sans titre)'}
+                        {c.title ?? "(sans titre)"}
                       </p>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
                         {c.merchants?.canonical_name && (
@@ -226,12 +223,12 @@ export function ManualLinkModal({
               onClick={() => linkMutation.mutate()}
               disabled={!selectedId || linkMutation.isPending}
               className={cn(
-                'flex-1 py-2.5 font-body font-medium text-sm',
-                'bg-sesame-accent text-sesame-surface border-2 border-sesame-text rounded shadow-brutal-sm',
-                'cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed',
+                "flex-1 py-2.5 font-body font-medium text-sm",
+                "bg-sesame-accent text-sesame-surface border-2 border-sesame-text rounded shadow-brutal-sm",
+                "cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
-              {linkMutation.isPending ? 'En cours...' : 'Confirmer'}
+              {linkMutation.isPending ? "En cours..." : "Confirmer"}
             </button>
           </div>
         </Dialog.Content>

@@ -1,9 +1,4 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import Notification03Icon from '@hugeicons/core-free-icons/Notification03Icon';
-import Settings02Icon from '@hugeicons/core-free-icons/Settings02Icon';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { Avatar, AvatarFallback } from '@/components/ui/Avatar.tsx';
+import { Avatar, AvatarFallback } from "@/components/ui/Avatar.tsx";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,12 +6,17 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/DropdownMenu.tsx';
-import { useAuthStore } from '@/stores/authStore.ts';
-import { supabase } from '@/lib/supabase.ts';
+} from "@/components/ui/DropdownMenu.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { supabase } from "@/lib/supabase.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import Notification03Icon from "@hugeicons/core-free-icons/Notification03Icon";
+import Settings02Icon from "@hugeicons/core-free-icons/Settings02Icon";
+import React from "react";
+import { useNavigate } from "react-router-dom";
 
 function getInitials(email: string | undefined): string {
-  if (!email) return '?';
+  if (!email) return "?";
   return email.charAt(0).toUpperCase();
 }
 
@@ -26,14 +26,14 @@ export function Header(): React.JSX.Element {
 
   const handleSignOut = async (): Promise<void> => {
     await supabase.auth.signOut();
-    navigate('/auth/connexion');
+    navigate("/auth/connexion");
   };
 
   return (
     <header className="sticky top-0 z-40 bg-sesame-surface border-b-2 border-sesame-text">
       <div className="flex items-center justify-between px-4 h-14">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="font-heading font-bold text-xl text-sesame-text tracking-tight cursor-pointer bg-transparent border-none p-0"
           aria-label="Sésame — Accueil"
         >
@@ -67,11 +67,11 @@ export function Header(): React.JSX.Element {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <div className="px-3 py-2 text-xs text-sesame-text-muted font-body">
-                {user?.email ?? ''}
+                {user?.email ?? ""}
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <DropdownMenuItem onClick={() => navigate('/reglages')}>
+                <DropdownMenuItem onClick={() => navigate("/reglages")}>
                   <Icon
                     icon={Settings02Icon}
                     size={16}
@@ -83,10 +83,7 @@ export function Header(): React.JSX.Element {
                 </DropdownMenuItem>
               </DropdownMenuGroup>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => void handleSignOut()}
-                destructive
-              >
+              <DropdownMenuItem onClick={() => void handleSignOut()} destructive>
                 Se déconnecter
               </DropdownMenuItem>
             </DropdownMenuContent>

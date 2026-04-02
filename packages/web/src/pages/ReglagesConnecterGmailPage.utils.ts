@@ -1,6 +1,6 @@
-const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] as string;
-const GOOGLE_CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'] as string;
-const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly email profile';
+const SUPABASE_URL = import.meta.env["VITE_SUPABASE_URL"] as string;
+const GOOGLE_CLIENT_ID = import.meta.env["VITE_GOOGLE_CLIENT_ID"] as string;
+const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.readonly email profile";
 
 export type MailAccount = {
   id: string;
@@ -18,10 +18,10 @@ export function buildGoogleOAuthUrl(userId: string, context?: string): string {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: redirectUri,
-    response_type: 'code',
+    response_type: "code",
     scope: GMAIL_SCOPE,
-    access_type: 'offline',
-    prompt: 'consent',
+    access_type: "offline",
+    prompt: "consent",
     state: stateValue,
   });
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

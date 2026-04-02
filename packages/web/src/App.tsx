@@ -1,17 +1,17 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AppLayout } from '@/components/layout/AppLayout.tsx';
-import { ProtectedRoute } from '@/components/layout/ProtectedRoute.tsx';
-import { LoginPage } from '@/pages/LoginPage.tsx';
-import { DashboardPage } from '@/pages/DashboardPage.tsx';
-import { DossiersPage } from '@/pages/DossiersPage.tsx';
-import { RecherchePage } from '@/pages/RecherchePage.tsx';
-import { ReglagesPage } from '@/pages/ReglagesPage.tsx';
-import { ReglagesConnecterGmailPage } from '@/pages/ReglagesConnecterGmailPage.tsx';
-import { DossierDetailPage } from '@/pages/DossierDetailPage.tsx';
-import { OnboardingPage } from '@/pages/OnboardingPage.tsx';
-import { useAuth } from '@/hooks/useAuth.ts';
+import { AppLayout } from "@/components/layout/AppLayout.tsx";
+import { ProtectedRoute } from "@/components/layout/ProtectedRoute.tsx";
+import { useAuth } from "@/hooks/useAuth.ts";
+import { DashboardPage } from "@/pages/DashboardPage.tsx";
+import { DossierDetailPage } from "@/pages/DossierDetailPage.tsx";
+import { DossiersPage } from "@/pages/DossiersPage.tsx";
+import { LoginPage } from "@/pages/LoginPage.tsx";
+import { OnboardingPage } from "@/pages/OnboardingPage.tsx";
+import { RecherchePage } from "@/pages/RecherchePage.tsx";
+import { ReglagesConnecterGmailPage } from "@/pages/ReglagesConnecterGmailPage.tsx";
+import { ReglagesPage } from "@/pages/ReglagesPage.tsx";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 const queryClient = new QueryClient({
   defaultOptions: {

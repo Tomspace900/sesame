@@ -1,14 +1,14 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import tailwindcss from '@tailwindcss/vite';
-import { resolve } from 'path';
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { resolve } from "path";
+import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@': resolve(__dirname, './src'),
-      '@sesame/shared': resolve(__dirname, '../shared/src/index.ts'),
+      "@": resolve(__dirname, "./src"),
+      "@sesame/shared": resolve(__dirname, "../shared/src")
     },
   },
 });

@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase.ts';
-import { useAuthStore } from '@/stores/authStore.ts';
+import { supabase } from "@/lib/supabase.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState } from "react";
+import { toast } from "sonner";
 
 export type NotificationPreferences = {
   telegram: boolean;
@@ -35,20 +35,20 @@ export const DEFAULT_PREFS: NotificationPreferences = {
   renewal_reminder_days: 5,
 };
 
-const SUPABASE_URL = import.meta.env['VITE_SUPABASE_URL'] as string;
+const SUPABASE_URL = import.meta.env["VITE_SUPABASE_URL"] as string;
 
 export function useReglagesProfile() {
   const user = useAuthStore((s) => s.user);
   const queryClient = useQueryClient();
 
   const { data: profile } = useQuery<FullProfile | null>({
-    queryKey: ['profile', user?.id],
+    queryKey: ["profile", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
-        .from('profiles')
-        .select('display_name, telegram_chat_id, notification_preferences')
-        .eq('id', user.id)
+        .from("profiles")
+        .select("display_name, telegram_chat_id, notification_preferences")
+        .eq("id", user.id)
         .single();
       if (error) throw error;
       return data as FullProfile | null;
@@ -58,31 +58,31 @@ export function useReglagesProfile() {
 
   const { mutate: saveDisplayName, isPending: isSavingName } = useMutation({
     mutationFn: async (name: string) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ display_name: name.trim() })
-        .eq('id', user.id);
+        .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
-      toast.success('Nom sauvegardé');
+      void queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast.success("Nom sauvegardé");
     },
     onError: (err: Error) => toast.error(err.message),
   });
 
   const { mutate: savePrefs, isPending: isSavingPrefs } = useMutation({
     mutationFn: async (prefs: NotificationPreferences) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ notification_preferences: prefs })
-        .eq('id', user.id);
+        .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
     },
     onError: (err: Error) => toast.error(`Erreur sauvegarde : ${err.message}`),
   });
@@ -91,15 +91,15 @@ export function useReglagesProfile() {
 
   const updatePref = <K extends keyof NotificationPreferences>(
     key: K,
-    value: NotificationPreferences[K],
+    value: NotificationPreferences[K]
   ) => {
     // Read latest prefs from cache to avoid stale closure issues across rapid updates
-    const current = queryClient.getQueryData<FullProfile | null>(['profile', user?.id]);
+    const current = queryClient.getQueryData<FullProfile | null>(["profile", user?.id]);
     const currentPrefs = current?.notification_preferences ?? DEFAULT_PREFS;
     const updated = { ...currentPrefs, [key]: value };
 
     // Optimistic update — triggers immediate re-render
-    queryClient.setQueryData<FullProfile | null>(['profile', user?.id], (old) => {
+    queryClient.setQueryData<FullProfile | null>(["profile", user?.id], (old) => {
       if (!old) return old;
       return { ...old, notification_preferences: updated };
     });
@@ -114,24 +114,24 @@ export function useReglagesProfile() {
   const { mutate: verifyTelegramCode, isPending: isVerifying } = useMutation({
     mutationFn: async (code: string) => {
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token ?? '';
+      const token = sessionData.session?.access_token ?? "";
       const res = await fetch(`${SUPABASE_URL}/functions/v1/verify-telegram-pairing`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ code }),
       });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
-        throw new Error(body.error ?? 'Code invalide');
+        throw new Error(body.error ?? "Code invalide");
       }
     },
     onSuccess: () => {
       setVerifyError(null);
-      void queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
-      toast.success('Telegram connecté !');
+      void queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast.success("Telegram connecté !");
     },
     onError: (err: Error) => setVerifyError(err.message),
   });
@@ -140,33 +140,33 @@ export function useReglagesProfile() {
   const { mutate: sendTelegramTest, isPending: isSendingTest } = useMutation({
     mutationFn: async (_: undefined) => {
       const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token ?? '';
+      const token = sessionData.session?.access_token ?? "";
       const res = await fetch(`${SUPABASE_URL}/functions/v1/send-telegram-test`, {
-        method: 'POST',
+        method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
         const body = (await res.json()) as { error?: string };
-        throw new Error(body.error ?? 'Erreur envoi');
+        throw new Error(body.error ?? "Erreur envoi");
       }
     },
-    onSuccess: () => toast.success('Message envoyé sur Telegram !'),
+    onSuccess: () => toast.success("Message envoyé sur Telegram !"),
     onError: (err: Error) => toast.error(`Erreur : ${err.message}`),
   });
 
   // Telegram — disconnect
   const { mutate: disconnectTelegram } = useMutation({
     mutationFn: async (_: undefined) => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { error } = await supabase
-        .from('profiles')
+        .from("profiles")
         .update({ telegram_chat_id: null })
-        .eq('id', user.id);
+        .eq("id", user.id);
       if (error) throw error;
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['profile', user?.id] });
-      toast.success('Telegram déconnecté');
+      void queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
+      toast.success("Telegram déconnecté");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -192,14 +192,14 @@ export function useMailAccounts() {
   const queryClient = useQueryClient();
 
   const { data: accounts = [] } = useQuery<MailAccount[]>({
-    queryKey: ['mail-accounts', user?.id],
+    queryKey: ["mail-accounts", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
-        .from('mail_accounts')
-        .select('id, provider, email_address, last_sync_at, backfill_status, backfill_progress')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true });
+        .from("mail_accounts")
+        .select("id, provider, email_address, last_sync_at, backfill_status, backfill_progress")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
       if (error) throw error;
       return data as MailAccount[];
     },
@@ -210,17 +210,21 @@ export function useMailAccounts() {
 
   const { mutate: disconnectAccount, isPending: isDisconnecting } = useMutation({
     mutationFn: async (id: string) => {
-      if (!user) throw new Error('Not authenticated');
-      const { error } = await supabase.from('mail_accounts').delete().eq('id', id).eq('user_id', user.id);
+      if (!user) throw new Error("Not authenticated");
+      const { error } = await supabase
+        .from("mail_accounts")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id);
       if (error) throw error;
     },
     onMutate: (id) => setDisconnectingId(id),
     onSettled: () => setDisconnectingId(null),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['mail-accounts', user?.id] });
-      void queryClient.invalidateQueries({ queryKey: ['mail-account-gmail', user?.id] });
-      void queryClient.invalidateQueries({ queryKey: ['mail-accounts-count', user?.id] });
-      toast.success('Compte déconnecté');
+      void queryClient.invalidateQueries({ queryKey: ["mail-accounts", user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ["mail-account-gmail", user?.id] });
+      void queryClient.invalidateQueries({ queryKey: ["mail-accounts-count", user?.id] });
+      toast.success("Compte déconnecté");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -232,26 +236,26 @@ export function useStats() {
   const user = useAuthStore((s) => s.user);
 
   const { data: dossierCount = 0 } = useQuery<number>({
-    queryKey: ['stats-dossiers-count', user?.id],
+    queryKey: ["stats-dossiers-count", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { count } = await supabase
-        .from('dossiers')
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id);
+        .from("dossiers")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id);
       return count ?? 0;
     },
     enabled: !!user,
   });
 
   const { data: mailsAnalysed = 0 } = useQuery<number>({
-    queryKey: ['stats-mails-analysed', user?.id],
+    queryKey: ["stats-mails-analysed", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data } = await supabase
-        .from('mail_accounts')
-        .select('backfill_progress')
-        .eq('user_id', user.id);
+        .from("mail_accounts")
+        .select("backfill_progress")
+        .eq("user_id", user.id);
       return (data ?? []).reduce((sum, acc) => {
         const p = acc.backfill_progress as { processed: number } | null;
         return sum + (p?.processed ?? 0);
@@ -261,14 +265,14 @@ export function useStats() {
   });
 
   const { data: sourceCount = 0 } = useQuery<number>({
-    queryKey: ['stats-source-count', user?.id],
+    queryKey: ["stats-source-count", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data } = await supabase
-        .from('dossiers')
-        .select('merchant_id')
-        .eq('user_id', user.id)
-        .not('merchant_id', 'is', null);
+        .from("dossiers")
+        .select("merchant_id")
+        .eq("user_id", user.id)
+        .not("merchant_id", "is", null);
       const distinct = new Set((data ?? []).map((d) => d.merchant_id as string));
       return distinct.size;
     },
@@ -276,14 +280,14 @@ export function useStats() {
   });
 
   const { data: totalValue = 0 } = useQuery<number>({
-    queryKey: ['stats-total-value', user?.id],
+    queryKey: ["stats-total-value", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data } = await supabase
-        .from('dossiers')
-        .select('amount')
-        .eq('user_id', user.id)
-        .not('amount', 'is', null);
+        .from("dossiers")
+        .select("amount")
+        .eq("user_id", user.id)
+        .not("amount", "is", null);
       return (data ?? []).reduce((sum, d) => sum + ((d.amount as number) ?? 0), 0);
     },
     enabled: !!user,

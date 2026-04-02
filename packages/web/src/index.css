@@ -10,15 +10,15 @@
    ============================================================= */
 @theme {
   /* Couleurs */
-  --color-sesame-bg: #F7F4EB;
-  --color-sesame-surface: #FCFAF5;
-  --color-sesame-surface-muted: #EBE5D9;
-  --color-sesame-text: #2A241F;
-  --color-sesame-text-muted: #7A7065;
-  --color-sesame-accent: #FF5C00;
-  --color-sesame-danger: #FF0055;
-  --color-sesame-positive: #CCFF00;
-  --color-sesame-transit: #00E5FF;
+  --color-sesame-bg: #f7f4eb;
+  --color-sesame-surface: #fcfaf5;
+  --color-sesame-surface-muted: #ebe5d9;
+  --color-sesame-text: #2a241f;
+  --color-sesame-text-muted: #7a7065;
+  --color-sesame-accent: #ff5c00;
+  --color-sesame-danger: #ff0055;
+  --color-sesame-positive: #ccff00;
+  --color-sesame-transit: #00e5ff;
 
   /* Typographies */
   --font-heading: "Fraunces", "Cormorant Garamond", serif;
@@ -32,14 +32,16 @@
   --radius-pill: 9999px;
 
   /* Ombres neo-brutalistes */
-  --shadow-brutal: 4px 4px 0px #2A241F;
-  --shadow-brutal-sm: 2px 2px 0px #2A241F;
+  --shadow-brutal: 4px 4px 0px #2a241f;
+  --shadow-brutal-sm: 2px 2px 0px #2a241f;
 }
 
 /* =============================================================
    BASE STYLES
    ============================================================= */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -69,11 +71,13 @@ body {
 
 /* Bouton — enfoncement complet au :active */
 .btn-brutal {
-  box-shadow: 4px 4px 0px #2A241F;
-  transition: box-shadow 0.1s ease, transform 0.1s ease;
+  box-shadow: 4px 4px 0px #2a241f;
+  transition:
+    box-shadow 0.1s ease,
+    transform 0.1s ease;
 }
 .btn-brutal:hover {
-  box-shadow: 6px 6px 0px #2A241F;
+  box-shadow: 6px 6px 0px #2a241f;
 }
 .btn-brutal:active {
   box-shadow: none;
@@ -82,29 +86,33 @@ body {
 
 /* Carte dans un flex/grid — PAS de translate */
 .card-brutal {
-  box-shadow: 4px 4px 0px #2A241F;
+  box-shadow: 4px 4px 0px #2a241f;
   transition: box-shadow 0.1s ease;
 }
 .card-brutal:hover {
-  box-shadow: 6px 6px 0px #2A241F;
+  box-shadow: 6px 6px 0px #2a241f;
 }
 .card-brutal:active {
-  box-shadow: 2px 2px 0px #2A241F;
+  box-shadow: 2px 2px 0px #2a241f;
 }
 
 /* =============================================================
    BACKFILL BANNER — shimmer indéterminé
    ============================================================= */
 @keyframes backfill-shimmer {
-  0%   { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
+  }
 }
 .backfill-shimmer::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   animation: backfill-shimmer 1.4s ease infinite;
 }
 .backfill-shimmer {
@@ -119,9 +127,9 @@ body {
   height: 4px;
 }
 ::-webkit-scrollbar-track {
-  background: #EBE5D9;
+  background: #ebe5d9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #7A7065;
+  background: #7a7065;
   border-radius: 2px;
 }

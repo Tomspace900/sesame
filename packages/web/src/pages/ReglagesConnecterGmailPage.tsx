@@ -1,18 +1,18 @@
-import React, { useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
-import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import { Button } from '@/components/ui/Button.tsx';
-import { Progress } from '@/components/ui/Progress.tsx';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { SectionTitle } from '@/components/ui/SectionTitle.tsx';
-import { supabase } from '@/lib/supabase.ts';
-import { useAuthStore } from '@/stores/authStore.ts';
-import { buildGoogleOAuthUrl, type MailAccount } from './ReglagesConnecterGmailPage.utils.ts';
+import { Button } from "@/components/ui/Button.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { Progress } from "@/components/ui/Progress.tsx";
+import { SectionTitle } from "@/components/ui/SectionTitle.tsx";
+import { supabase } from "@/lib/supabase.ts";
+import { useAuthStore } from "@/stores/authStore.ts";
+import Alert02Icon from "@hugeicons/core-free-icons/Alert02Icon";
+import CheckmarkCircle02Icon from "@hugeicons/core-free-icons/CheckmarkCircle02Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import React, { useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { buildGoogleOAuthUrl, type MailAccount } from "./ReglagesConnecterGmailPage.utils.ts";
 
-const GOOGLE_CLIENT_ID = import.meta.env['VITE_GOOGLE_CLIENT_ID'] as string;
+const GOOGLE_CLIENT_ID = import.meta.env["VITE_GOOGLE_CLIENT_ID"] as string;
 
 export function ReglagesConnecterGmailPage(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
@@ -21,21 +21,21 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
-  const oauthStatus = searchParams.get('status');
-  const oauthError = searchParams.get('error');
-  const newAccountId = searchParams.get('account_id');
+  const oauthStatus = searchParams.get("status");
+  const oauthError = searchParams.get("error");
+  const newAccountId = searchParams.get("account_id");
 
   const { data: gmailAccount, isLoading } = useQuery<MailAccount | null>({
-    queryKey: ['mail-account-gmail', user?.id],
+    queryKey: ["mail-account-gmail", user?.id],
     queryFn: async () => {
-      if (!user) throw new Error('Not authenticated');
+      if (!user) throw new Error("Not authenticated");
       const { data, error } = await supabase
-        .from('mail_accounts')
+        .from("mail_accounts")
         .select(
-          'id, email_address, last_sync_at, backfill_status, backfill_progress, backfill_started_at, watch_expiration',
+          "id, email_address, last_sync_at, backfill_status, backfill_progress, backfill_started_at, watch_expiration"
         )
-        .eq('user_id', user.id)
-        .eq('provider', 'gmail')
+        .eq("user_id", user.id)
+        .eq("provider", "gmail")
         .maybeSingle();
       if (error) throw error;
       return data as MailAccount | null;
@@ -43,20 +43,20 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
     enabled: !!user,
     refetchInterval: (query) => {
       const data = query.state.data as MailAccount | null;
-      return data?.backfill_status === 'running' ? 3000 : false;
+      return data?.backfill_status === "running" ? 3000 : false;
     },
   });
 
   useEffect(() => {
-    if (oauthStatus === 'success' && newAccountId) {
-      queryClient.invalidateQueries({ queryKey: ['mail-account-gmail', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['backfill-status', user?.id] });
+    if (oauthStatus === "success" && newAccountId) {
+      queryClient.invalidateQueries({ queryKey: ["mail-account-gmail", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["backfill-status", user?.id] });
     }
   }, [oauthStatus, newAccountId, user?.id, queryClient]);
 
   const { mutate: startBackfill, isPending: isStartingBackfill } = useMutation({
     mutationFn: async (accountId: string) => {
-      const res = await supabase.functions.invoke('start-backfill', {
+      const res = await supabase.functions.invoke("start-backfill", {
         body: { mail_account_id: accountId },
         ...(session ? { headers: { Authorization: `Bearer ${session.access_token}` } } : {}),
       });
@@ -64,15 +64,15 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
       return res.data as { queued: number; total_estimate: number };
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mail-account-gmail', user?.id] });
-      queryClient.invalidateQueries({ queryKey: ['backfill-status', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["mail-account-gmail", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["backfill-status", user?.id] });
     },
   });
 
   const handleConnectGmail = () => {
     if (!user) return;
     if (!GOOGLE_CLIENT_ID) {
-      console.error('VITE_GOOGLE_CLIENT_ID is not set');
+      console.error("VITE_GOOGLE_CLIENT_ID is not set");
       return;
     }
     window.location.href = buildGoogleOAuthUrl(user.id);
@@ -82,27 +82,25 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
   const processed = backfillProgress?.processed ?? 0;
   const total = backfillProgress?.total ?? null;
   const backfillPct = total && total > 0 ? Math.round((processed / total) * 100) : 0;
-  const isBackfillRunning = gmailAccount?.backfill_status === 'running';
-  const isBackfillDone = gmailAccount?.backfill_status === 'done';
+  const isBackfillRunning = gmailAccount?.backfill_status === "running";
+  const isBackfillDone = gmailAccount?.backfill_status === "done";
 
   return (
     <div className="px-4 py-6 max-w-lg mx-auto">
       <button
-        onClick={() => navigate('/reglages')}
+        onClick={() => navigate("/reglages")}
         className="flex items-center gap-1 text-sesame-text-muted font-body text-sm mb-6 hover:text-sesame-text transition-colors cursor-pointer bg-transparent border-none p-0"
       >
         Réglages
       </button>
 
-      <h1 className="font-heading font-semibold text-2xl text-sesame-text mb-1">
-        Connecter Gmail
-      </h1>
+      <h1 className="font-heading font-semibold text-2xl text-sesame-text mb-1">Connecter Gmail</h1>
       <p className="text-sesame-text-muted font-body text-sm mb-8">
         Sésame va surveiller ta boîte Gmail et créer des dossiers automatiquement pour chaque mail
         transactionnel.
       </p>
 
-      {oauthStatus === 'success' && (
+      {oauthStatus === "success" && (
         <div className="flex items-center gap-3 p-4 mb-6 rounded-lg border-2 border-sesame-text bg-sesame-positive/15">
           <Icon icon={CheckmarkCircle02Icon} size={20} color="#2A241F" aria-hidden />
           <p className="font-body text-sm text-sesame-text font-medium">
@@ -117,7 +115,7 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
           <div>
             <p className="font-body text-sm text-sesame-text font-medium">Connexion échouée</p>
             <p className="font-body text-xs text-sesame-text-muted mt-0.5">
-              {oauthError === 'no_refresh_token'
+              {oauthError === "no_refresh_token"
                 ? "Autorise à nouveau l'accès depuis Google pour obtenir un token de rafraîchissement."
                 : decodeURIComponent(oauthError)}
             </p>
@@ -149,12 +147,12 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
                   </p>
                   {gmailAccount.last_sync_at && (
                     <p className="font-body text-xs text-sesame-text-muted mt-0.5">
-                      Dernière synchro{' '}
-                      {new Intl.RelativeTimeFormat('fr', { numeric: 'auto' }).format(
+                      Dernière synchro{" "}
+                      {new Intl.RelativeTimeFormat("fr", { numeric: "auto" }).format(
                         Math.round(
-                          (new Date(gmailAccount.last_sync_at).getTime() - Date.now()) / 60000,
+                          (new Date(gmailAccount.last_sync_at).getTime() - Date.now()) / 60000
                         ),
-                        'minutes',
+                        "minutes"
                       )}
                     </p>
                   )}
@@ -231,7 +229,7 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
                       Lancement...
                     </>
                   ) : (
-                    'Importer les anciens mails'
+                    "Importer les anciens mails"
                   )}
                 </Button>
               </div>
@@ -266,9 +264,9 @@ export function ReglagesConnecterGmailPage(): React.JSX.Element {
 
           <div className="space-y-2 px-1">
             {[
-              'Sésame ne lit que les mails transactionnels (commandes, billets, factures)',
+              "Sésame ne lit que les mails transactionnels (commandes, billets, factures)",
               "Aucun mail n'est transmis à des tiers",
-              'Tu peux déconnecter à tout moment',
+              "Tu peux déconnecter à tout moment",
             ].map((item) => (
               <div key={item} className="flex items-start gap-2">
                 <Icon icon={CheckmarkCircle02Icon} size={14} color="#7A7065" aria-hidden />

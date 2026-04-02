@@ -1,5 +1,5 @@
-import React from 'react';
-import { HugeiconsIcon, type IconSvgElement } from '@hugeicons/react';
+import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react";
+import React from "react";
 
 export type { IconSvgElement };
 
@@ -10,18 +10,18 @@ export type IconProps = {
   color?: string;
   strokeWidth?: number;
   className?: string;
-  'aria-hidden'?: boolean;
-  'aria-label'?: string;
+  "aria-hidden"?: boolean;
+  "aria-label"?: string;
 };
 
 export function Icon({
   icon,
   size = 20,
-  color = 'currentColor',
+  color = "currentColor",
   strokeWidth = 2,
   className,
-  'aria-hidden': ariaHidden,
-  'aria-label': ariaLabel,
+  "aria-hidden": ariaHidden,
+  "aria-label": ariaLabel,
 }: IconProps): React.JSX.Element {
   return (
     <HugeiconsIcon

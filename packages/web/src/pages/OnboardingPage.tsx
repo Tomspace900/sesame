@@ -1,15 +1,15 @@
-import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import MagicWand01Icon from '@hugeicons/core-free-icons/MagicWand01Icon';
-import CheckmarkCircle02Icon from '@hugeicons/core-free-icons/CheckmarkCircle02Icon';
-import Loading03Icon from '@hugeicons/core-free-icons/Loading03Icon';
-import Alert02Icon from '@hugeicons/core-free-icons/Alert02Icon';
-import { Button } from '@/components/ui/Button.tsx';
-import { Icon } from '@/components/ui/Icon.tsx';
-import { Input } from '@/components/ui/Input.tsx';
-import { Label } from '@/components/ui/Label.tsx';
-import { Progress } from '@/components/ui/Progress.tsx';
-import { type OnboardingStep, type BackfillInfo, useOnboarding } from './OnboardingPage.hooks.ts';
+import { Button } from "@/components/ui/Button.tsx";
+import { Icon } from "@/components/ui/Icon.tsx";
+import { Input } from "@/components/ui/Input.tsx";
+import { Label } from "@/components/ui/Label.tsx";
+import { Progress } from "@/components/ui/Progress.tsx";
+import Alert02Icon from "@hugeicons/core-free-icons/Alert02Icon";
+import CheckmarkCircle02Icon from "@hugeicons/core-free-icons/CheckmarkCircle02Icon";
+import Loading03Icon from "@hugeicons/core-free-icons/Loading03Icon";
+import MagicWand01Icon from "@hugeicons/core-free-icons/MagicWand01Icon";
+import React, { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useOnboarding, type BackfillInfo, type OnboardingStep } from "./OnboardingPage.hooks.ts";
 
 function OnboardingStepIndicator({ step }: { step: OnboardingStep }): React.JSX.Element {
   const steps = [1, 2, 3] as const;
@@ -19,16 +19,16 @@ function OnboardingStepIndicator({ step }: { step: OnboardingStep }): React.JSX.
         <React.Fragment key={s}>
           {idx > 0 && (
             <div
-              className={`flex-1 h-0.5 ${step > idx ? 'bg-sesame-positive' : 'bg-sesame-surface-muted'}`}
+              className={`flex-1 h-0.5 ${step > idx ? "bg-sesame-positive" : "bg-sesame-surface-muted"}`}
             />
           )}
           <div
             className={`w-7 h-7 rounded-pill border-2 border-sesame-text flex items-center justify-center shrink-0 ${
               step > s
-                ? 'bg-sesame-positive'
+                ? "bg-sesame-positive"
                 : step === s
-                  ? 'bg-sesame-accent'
-                  : 'bg-sesame-surface-muted'
+                  ? "bg-sesame-accent"
+                  : "bg-sesame-surface-muted"
             }`}
           >
             <span className="font-body text-xs font-medium text-sesame-text">{s}</span>
@@ -55,7 +55,7 @@ function OnboardingStep1({ displayName, onNext }: Step1Props): React.JSX.Element
       </div>
       <div className="space-y-3">
         <h1 className="font-heading font-bold text-3xl text-sesame-text">
-          {trimmed ? `Bienvenue, ${trimmed}` : 'Bienvenue'}
+          {trimmed ? `Bienvenue, ${trimmed}` : "Bienvenue"}
         </h1>
         <p className="font-body text-sesame-text-muted">
           Sésame va scanner tes mails pour retrouver tes commandes, suivre tes colis et surveiller
@@ -87,11 +87,11 @@ function OnboardingStep1({ displayName, onNext }: Step1Props): React.JSX.Element
 }
 
 function oauthErrorMessage(error: string): string {
-  if (error === 'no_refresh_token') {
+  if (error === "no_refresh_token") {
     return "Autorise à nouveau l'accès depuis Google pour obtenir un token de rafraîchissement.";
   }
-  if (error === 'email_already_used') {
-    return 'Cette adresse Gmail est déjà connectée à un autre compte Sésame.';
+  if (error === "email_already_used") {
+    return "Cette adresse Gmail est déjà connectée à un autre compte Sésame.";
   }
   return decodeURIComponent(error);
 }
@@ -103,13 +103,16 @@ type Step2Props = {
   onNext: () => void;
 };
 
-function OnboardingStep2({ hasGmail, oauthError, onConnectGmail, onNext }: Step2Props): React.JSX.Element {
+function OnboardingStep2({
+  hasGmail,
+  oauthError,
+  onConnectGmail,
+  onNext,
+}: Step2Props): React.JSX.Element {
   return (
     <div className="space-y-6">
       <div className="space-y-2">
-        <h2 className="font-heading font-bold text-2xl text-sesame-text">
-          Connecte ta boîte mail
-        </h2>
+        <h2 className="font-heading font-bold text-2xl text-sesame-text">Connecte ta boîte mail</h2>
         <p className="font-body text-sm text-sesame-text-muted">
           Sésame surveille tes mails et crée des dossiers automatiquement pour chaque transaction.
         </p>
@@ -242,8 +245,8 @@ function OnboardingStep3({ backfill, dossierCount, onDone }: Step3Props): React.
             </div>
             {backfill.total !== null && (
               <span className="font-body text-xs text-sesame-text-muted">
-                {backfill.processed.toLocaleString('fr-FR')}/
-                {backfill.total.toLocaleString('fr-FR')}
+                {backfill.processed.toLocaleString("fr-FR")}/
+                {backfill.total.toLocaleString("fr-FR")}
               </span>
             )}
           </div>
@@ -253,13 +256,13 @@ function OnboardingStep3({ backfill, dossierCount, onDone }: Step3Props): React.
         <div className="grid grid-cols-2 gap-3 pt-3 border-t-2 border-sesame-text/10">
           <div>
             <p className="font-heading font-semibold text-2xl text-sesame-text">
-              {backfill.processed.toLocaleString('fr-FR')}
+              {backfill.processed.toLocaleString("fr-FR")}
             </p>
             <p className="font-body text-xs text-sesame-text-muted">mails analysés</p>
           </div>
           <div>
             <p className="font-heading font-semibold text-2xl text-sesame-text">
-              {dossierCount.toLocaleString('fr-FR')}
+              {dossierCount.toLocaleString("fr-FR")}
             </p>
             <p className="font-body text-xs text-sesame-text-muted">dossiers retrouvés</p>
           </div>
@@ -281,10 +284,10 @@ export function OnboardingPage(): React.JSX.Element {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const initialStep: OnboardingStep = searchParams.get('status') === 'success' ? 3 : 1;
+  const initialStep: OnboardingStep = searchParams.get("status") === "success" ? 3 : 1;
   const [step, setStep] = useState<OnboardingStep>(initialStep);
 
-  const oauthError = searchParams.get('error');
+  const oauthError = searchParams.get("error");
 
   const { displayName, saveDisplayName, hasGmail, backfill, dossierCount, handleConnectGmail } =
     useOnboarding(step);
@@ -303,7 +306,7 @@ export function OnboardingPage(): React.JSX.Element {
 
           {step === 1 && (
             <OnboardingStep1
-              key={displayName || 'init'}
+              key={displayName || "init"}
               displayName={displayName}
               onNext={(name) => {
                 saveDisplayName(name);
@@ -323,7 +326,7 @@ export function OnboardingPage(): React.JSX.Element {
             <OnboardingStep3
               backfill={backfill}
               dossierCount={dossierCount}
-              onDone={() => void navigate('/')}
+              onDone={() => void navigate("/")}
             />
           )}
         </div>

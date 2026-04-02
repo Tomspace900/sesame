@@ -1,10 +1,8 @@
-import * as React from 'react';
-import * as ProgressPrimitive from '@radix-ui/react-progress';
-import { cn } from '@/lib/utils.ts';
+import { cn } from "@/lib/utils.ts";
+import * as ProgressPrimitive from "@radix-ui/react-progress";
+import * as React from "react";
 
-export type ProgressProps = React.ComponentPropsWithoutRef<
-  typeof ProgressPrimitive.Root
->;
+export type ProgressProps = React.ComponentPropsWithoutRef<typeof ProgressPrimitive.Root>;
 
 export const Progress = React.forwardRef<
   React.ElementRef<typeof ProgressPrimitive.Root>,
@@ -13,9 +11,9 @@ export const Progress = React.forwardRef<
   <ProgressPrimitive.Root
     ref={ref}
     className={cn(
-      'relative h-2 w-full overflow-hidden rounded border-2 border-sesame-text',
-      'bg-sesame-surface-muted',
-      className,
+      "relative h-2 w-full overflow-hidden rounded border-2 border-sesame-text",
+      "bg-sesame-surface-muted",
+      className
     )}
     {...props}
   >
