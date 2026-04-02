@@ -453,7 +453,7 @@ Dédié mobile. Sur desktop, la search bar de `/dossiers` suffit.
 
 **Variante standard :**
 - shadcn/ui Card, fond `sesame-surface`, bordure 2px `sesame-text`, radius 12px, ombre `shadow-brutal`
-- Hover : bordure `sesame-accent`
+- Hover : ombre augmentée à `6px 6px 0px #2A241F` (PAS de bordure orange)
 - Active : ombre réduite à `shadow-brutal-sm` (PAS de translate)
 - Image 48x48 ou icône HugeIcons par `dossier_type` si pas d'image :
   - purchase : `box-01`

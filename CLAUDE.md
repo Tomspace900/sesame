@@ -27,7 +27,7 @@ Lire ces fichiers **avant** d'implémenter quoi que ce soit :
 | `dossier_type` | Type |
 | `reference` | Référence |
 
-`dossier_type` : `purchase` · `trip` · `accommodation` · `subscription` · `reservation` · `other`
+`dossier_type` : `purchase` · `travel` · `accommodation` · `subscription` · `booking` · `other`
 
 ## Architecture
 

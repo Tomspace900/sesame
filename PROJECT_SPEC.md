@@ -150,7 +150,7 @@ CREATE TABLE dossiers (
   merchant_id UUID REFERENCES merchants(id),
 
   dossier_type TEXT NOT NULL DEFAULT 'purchase' CHECK (dossier_type IN (
-    'purchase', 'trip', 'accommodation', 'subscription', 'reservation', 'other'
+    'purchase', 'travel', 'accommodation', 'subscription', 'booking', 'other'
   )),
 
   -- Communs
@@ -309,7 +309,7 @@ Les prompts sont dans `packages/shared/src/prompts/` (source) et copiés dans `s
 ### Extraction + Linking
 - **Champs filtrés par type** — seuls les champs pertinents au `dossier_type` sont demandés (plus de JSON skeleton avec 30+ champs null).
 - **Type suggestion** : le `email_type` de la classification est transmis au prompt d'extraction pour guider le typage.
-- **Titre** : instructions explicites avec exemples ✅/❌ par type (nom du produit pour purchase, "Vol X → Y" pour trip, etc.).
+- **Titre** : instructions explicites avec exemples ✅/❌ par type (nom du produit pour purchase, "Transporteur Origine → Destination" pour travel, "{Provider} {Ville}" pour accommodation, etc.).
 - **check_in_time / check_out_time** : format "HH:MM", pas ISO 8601.
 - **human_summary** : tutoiement obligatoire, exemples par event_type.
 - **Linking** : hiérarchie reference > fuzzy_match > llm. `dossier_type: "other"` est interdit, transformé en `purchase` par le Zod schema.
@@ -486,7 +486,7 @@ ENCRYPTION_KEY=
 12. **HugeIcons stroke-rounded (plan gratuit)** — zéro emoji.
 13. **Vocabulaire UI agnostique** — "Dossier", "Source", "Référence".
 14. **Ton Sésame** — proactif, tutoiement, chaleureux, pas de jargon.
-15. **Modèle "dossier" multi-type** — purchase, trip, accommodation, subscription, reservation.
+15. **Modèle "dossier" multi-type** — purchase, travel, accommodation, subscription, booking, other.
 16. **Champs spécifiques en colonnes** — pas de JSONB type_data, pour SQL et index.
 17. **Full-text search Postgres** — tsvector généré, pas de moteur externe.
 18. **`human_summary` stocké** — généré par Gemini à l'extraction, stocké dans chaque event.

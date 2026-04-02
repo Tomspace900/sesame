@@ -90,13 +90,13 @@ Style : **neo-brutalisme adouci**. Bordures visibles, ombres franches, angles l√
 ```css
 .card-brutal {
   box-shadow: 4px 4px 0px #2A241F;
-  transition: all 0.1s ease;
+  transition: box-shadow 0.1s ease;
+}
+.card-brutal:hover {
+  box-shadow: 6px 6px 0px #2A241F;
 }
 .card-brutal:active {
   box-shadow: 2px 2px 0px #2A241F;
-}
-.card-brutal:hover {
-  border-color: #FF5C00;
 }
 ```
 
