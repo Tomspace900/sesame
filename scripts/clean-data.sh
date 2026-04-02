@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# reset-data.sh — Vide les données de traitement sans toucher aux comptes Gmail.
+# clean-data.sh — Efface toutes les données de traitement sans toucher aux comptes Gmail.
 set -euo pipefail
 
 DB="postgresql://postgres:postgres@localhost:54322/postgres"
+GREEN='\033[32m'; RESET='\033[0m'
 
-echo "==> Nettoyage des données de traitement..."
+echo "==> Nettoyage des données..."
 psql "$DB" -q <<'SQL'
 TRUNCATE TABLE dossier_events CASCADE;
 TRUNCATE TABLE dossiers CASCADE;
@@ -16,4 +17,4 @@ UPDATE mail_accounts SET
   backfill_started_at = NULL;
 SQL
 
-echo "==> OK. Queue, emails, dossiers et events vidés. Comptes Gmail conservés."
+echo -e "${GREEN}==> Effacé : emails, dossiers, événements, queue. Comptes Gmail conservés.${RESET}"

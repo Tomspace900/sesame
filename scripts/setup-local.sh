@@ -52,5 +52,19 @@ echo "    Test manuel des crons :"
 echo "    curl http://127.0.0.1:54321/functions/v1/process-queue"
 echo "    curl http://127.0.0.1:54321/functions/v1/renew-watches"
 echo ""
+echo "    Debug — backfill + processing :"
+echo '    TOKEN="<jwt>"  # App → DevTools → Local Storage → sb-*-auth-token → access_token'
+echo '    curl -s -X POST http://127.0.0.1:54321/functions/v1/start-backfill \'
+echo '      -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \'
+echo '      -d '"'"'{"mail_account_id":"<id>","limit_messages":10}'"'"' | jq'
+echo '    for i in $(seq 1 10); do curl -s http://127.0.0.1:54321/functions/v1/process-queue | jq; sleep 5; done'
+echo ""
+echo "    Scripts utilitaires :"
+echo "    ./scripts/monitor.sh              # live (Ctrl+C pour quitter)"
+echo "    ./scripts/monitor.sh --errors     # erreurs détaillées"
+echo "    ./scripts/monitor.sh --item <id>  # inspecte un item"
+echo "    ./scripts/clean-queue.sh          # vide queue + remet idle"
+echo "    ./scripts/clean-data.sh           # efface emails, dossiers, événements, queue"
+echo ""
 echo "    Génère ENCRYPTION_KEY  : openssl rand -hex 32"
 echo "    Logs des cron jobs     : SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 10;"
