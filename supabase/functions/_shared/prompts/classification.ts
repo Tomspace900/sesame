@@ -2,7 +2,7 @@
 // PROMPT GEMINI — CLASSIFICATION v2
 // ============================================================
 
-export const CLASSIFICATION_PROMPT_VERSION = '2.0.0';
+export const CLASSIFICATION_PROMPT_VERSION = '3.0.0';
 
 export function buildClassificationPrompt(params: {
   subject: string;
@@ -30,7 +30,7 @@ Les seuls types valides sont :
 | invoice | Facture reçue pour un achat ou service |
 | return_confirmation | Retour/remboursement confirmé |
 | cancellation | Annulation d'une commande ou réservation |
-| booking_confirmation | Réservation confirmée (vol, train, restaurant, activité, location voiture) |
+| booking_confirmation | Réservation confirmée (vol, train, restaurant, activité, VTC, location voiture, cours) |
 | booking_update | Modification d'une réservation existante |
 | check_in_open | Enregistrement en ligne ouvert (vol, train) |
 | boarding_pass | Carte d'embarquement reçue |

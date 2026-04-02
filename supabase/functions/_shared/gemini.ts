@@ -9,7 +9,7 @@ async function sleep(ms: number): Promise<void> {
 export async function callGemini(
   apiKey: string,
   prompt: string,
-  model = "gemini-2.5-flash-lite"
+  model = "gemini-2.5-flash"
 ): Promise<string> {
   const url = `${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`;
 
