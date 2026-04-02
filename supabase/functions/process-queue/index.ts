@@ -2,7 +2,9 @@
 // Dequeues one pending item, fetches the email, classifies and extracts with Gemini,
 // then inserts or updates dossiers + dossier_events.
 
+// deno-lint-ignore no-import-prefix
 import { createClient } from "npm:@supabase/supabase-js@2";
+// deno-lint-ignore no-import-prefix
 import { z } from "npm:zod@3";
 import { decryptToken, encryptToken } from "../_shared/crypto.ts";
 import { callGemini, extractJson } from "../_shared/gemini.ts";
@@ -84,10 +86,10 @@ const ExtractedDataSchema = z.object({
 const ExtractionSchema = z.object({
   dossier_type: z.enum([
     "purchase",
-    "trip",
+    "travel",
     "accommodation",
     "subscription",
-    "reservation",
+    "booking",
     "other",
   ]).transform((v: string) => v === "other" ? "purchase" : v), // C7: never use "other", fallback to purchase
   event_type: z.string(),
@@ -110,6 +112,7 @@ type ExtractionResult = z.infer<typeof ExtractionSchema>;
 // Strip them before JSON.parse to avoid "Bad control character" errors.
 function sanitizeJson(raw: string): string {
   // Replace control characters except tab, newline, carriage return
+  // deno-lint-ignore no-control-regex
   return raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
 }
 
@@ -202,6 +205,38 @@ function eventTypeToStatus(eventType: string): string {
     subscription_cancellation: "cancelled",
   };
   return map[eventType] ?? "detected";
+}
+
+// Status hierarchy — higher rank = more advanced state.
+// Terminal states (cancelled, returned) have rank 99 and are never overridden.
+const STATUS_RANK: Record<string, number> = {
+  detected: 0,
+  confirmed: 1,
+  in_progress: 2,
+  completed: 3,
+  cancelled: 99,
+  returned: 99,
+};
+
+// Returns the status to apply given the current dossier status and the new status from the event.
+// Rules:
+//   - Terminal states (cancelled, returned) are ALWAYS applied — they override everything.
+//   - From a terminal state, nothing can override it (no re-activation).
+//   - Otherwise, only upgrade (new rank >= current rank).
+function resolveStatus(currentStatus: string | undefined, newStatus: string): string {
+  const isTerminalNew = newStatus === 'cancelled' || newStatus === 'returned';
+  const isTerminalCurrent = currentStatus === 'cancelled' || currentStatus === 'returned';
+
+  // Terminal events always win (cancellation overrides everything)
+  if (isTerminalNew) return newStatus;
+
+  // Current is terminal — keep it (don't re-activate a cancelled dossier with a shipping event)
+  if (isTerminalCurrent) return currentStatus!;
+
+  // Non-terminal: only upgrade
+  const newRank = STATUS_RANK[newStatus] ?? 0;
+  const curRank = currentStatus ? (STATUS_RANK[currentStatus] ?? 0) : 0;
+  return newRank >= curRank ? newStatus : currentStatus!;
 }
 
 function calculateDeadlines(
@@ -742,15 +777,22 @@ async function processItem(queueItem: {
   const shouldLink =
     extraction.existing_dossier_id &&
     extraction.match_confidence !== null &&
-    extraction.match_confidence >= 0.6;
+    extraction.match_confidence >= 0.8;
 
   // C1: If Gemini didn't link but pre-link found a match, use the pre-link result
   const usePreLink = !shouldLink && preLink;
 
+  // Retrieve current status of the target dossier from context (to apply resolveStatus)
+  function getCurrentDossierStatus(dossierId: string): string | undefined {
+    return dossierContext.find((d) => d.id === dossierId)?.status;
+  }
+
   // Build update payload for linking to existing dossier (avoids duplication)
-  function buildLinkUpdatePayload(): Record<string, unknown> {
+  function buildLinkUpdatePayload(targetDossierId: string): Record<string, unknown> {
+    const currentStatus = getCurrentDossierStatus(targetDossierId);
+    const resolvedStatus = resolveStatus(currentStatus, newStatus);
     const payload: Record<string, unknown> = {
-      status: newStatus,
+      status: resolvedStatus,
       updated_at: new Date().toISOString(),
     };
     if (ex.tracking_number) payload.tracking_number = ex.tracking_number;
@@ -773,14 +815,14 @@ async function processItem(queueItem: {
 
   if (shouldLink && extraction.existing_dossier_id) {
     dossierId = extraction.existing_dossier_id;
-    await supabase.from("dossiers").update(buildLinkUpdatePayload()).eq("id", dossierId);
+    await supabase.from("dossiers").update(buildLinkUpdatePayload(dossierId)).eq("id", dossierId);
   } else if (usePreLink) {
     // C1: Pre-link matched by SQL reference lookup
     dossierId = preLink.dossierId;
     finalLinkedBy = "reference";
     finalMatchConfidence = 1.0;
     console.log(`Pre-linked email ${emailId} to dossier ${dossierId} by reference ${preLink.reference}`);
-    await supabase.from("dossiers").update(buildLinkUpdatePayload()).eq("id", dossierId);
+    await supabase.from("dossiers").update(buildLinkUpdatePayload(dossierId)).eq("id", dossierId);
   } else {
     // Create new dossier
     const newDossier: Record<string, unknown> = {
