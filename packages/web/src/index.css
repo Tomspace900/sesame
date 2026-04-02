@@ -1,0 +1,127 @@
+/* =============================================================
+   GOOGLE FONTS — @import doit précéder toutes les autres règles
+   ============================================================= */
+@import url("https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Plus+Jakarta+Sans:wght@400;500;600&display=swap");
+
+@import "tailwindcss";
+
+/* =============================================================
+   TAILWIND v4 THEME — Tokens Sésame
+   ============================================================= */
+@theme {
+  /* Couleurs */
+  --color-sesame-bg: #F7F4EB;
+  --color-sesame-surface: #FCFAF5;
+  --color-sesame-surface-muted: #EBE5D9;
+  --color-sesame-text: #2A241F;
+  --color-sesame-text-muted: #7A7065;
+  --color-sesame-accent: #FF5C00;
+  --color-sesame-danger: #FF0055;
+  --color-sesame-positive: #CCFF00;
+  --color-sesame-transit: #00E5FF;
+
+  /* Typographies */
+  --font-heading: "Fraunces", "Cormorant Garamond", serif;
+  --font-body: "Plus Jakarta Sans", "Outfit", sans-serif;
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-DEFAULT: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 9999px;
+
+  /* Ombres neo-brutalistes */
+  --shadow-brutal: 4px 4px 0px #2A241F;
+  --shadow-brutal-sm: 2px 2px 0px #2A241F;
+}
+
+/* =============================================================
+   BASE STYLES
+   ============================================================= */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-sesame-bg);
+  color: var(--color-sesame-text);
+  font-family: var(--font-body);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* =============================================================
+   COMPOSANTS NEO-BRUTALISTES
+   ============================================================= */
+
+/* Bouton — enfoncement complet au :active */
+.btn-brutal {
+  box-shadow: 4px 4px 0px #2A241F;
+  transition: box-shadow 0.1s ease, transform 0.1s ease;
+}
+.btn-brutal:hover {
+  box-shadow: 6px 6px 0px #2A241F;
+}
+.btn-brutal:active {
+  box-shadow: none;
+  transform: translate(4px, 4px);
+}
+
+/* Carte dans un flex/grid — PAS de translate */
+.card-brutal {
+  box-shadow: 4px 4px 0px #2A241F;
+  transition: box-shadow 0.1s ease;
+}
+.card-brutal:hover {
+  box-shadow: 6px 6px 0px #2A241F;
+}
+.card-brutal:active {
+  box-shadow: 2px 2px 0px #2A241F;
+}
+
+/* =============================================================
+   BACKFILL BANNER — shimmer indéterminé
+   ============================================================= */
+@keyframes backfill-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+.backfill-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: backfill-shimmer 1.4s ease infinite;
+}
+.backfill-shimmer {
+  background-color: var(--color-sesame-accent);
+}
+
+/* =============================================================
+   SCROLLBAR (discret)
+   ============================================================= */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #EBE5D9;
+}
+::-webkit-scrollbar-thumb {
+  background: #7A7065;
+  border-radius: 2px;
+}
