@@ -54,7 +54,9 @@ Deno.serve(async (req: Request) => {
   let update: TelegramUpdate;
   try {
     update = (await req.json()) as TelegramUpdate;
+    logger.debug(`Received payload: ${JSON.stringify(update)}`);
   } catch {
+    logger.debug(`Malformed body received, returning OK`);
     // Malformed body — ACK quand même pour éviter que Telegram retente
     return new Response("OK", { status: 200 });
   }
@@ -70,6 +72,7 @@ Deno.serve(async (req: Request) => {
 
   // Seule commande supportée : /start
   if (text !== "/start" && !text.startsWith("/start ")) {
+    logger.debug(`Received unknown command or text from chat ${chatId}`);
     await sendTelegramMessage(
       TELEGRAM_BOT_TOKEN,
       chatId,
@@ -85,6 +88,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     // Supprime tout code existant pour ce chat (idempotence)
+    logger.debug(`Deleting old pairing codes for chat ${chatId}`);
     await supabase
       .from("telegram_pairing_codes")
       .delete()

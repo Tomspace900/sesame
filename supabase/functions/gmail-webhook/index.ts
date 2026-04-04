@@ -48,6 +48,7 @@ Deno.serve(async (req: Request) => {
 
   const messageData = body.message?.data;
   if (!messageData) {
+    logger.debug(`No message data in Pub/Sub body, returning early`);
     // Pub/Sub ack even if no data — avoid redelivery
     return jsonSuccess({ queued: 0 });
   }
@@ -67,6 +68,7 @@ Deno.serve(async (req: Request) => {
     `Extracted payload - email: ${emailAddress}, historyId: ${newHistoryId}`,
   );
   if (!emailAddress || !newHistoryId) {
+    logger.debug(`Missing emailAddress or newHistoryId in payload`);
     return jsonSuccess({ queued: 0 });
   }
 
@@ -94,6 +96,7 @@ Deno.serve(async (req: Request) => {
     const needsRefresh = expiresAt.getTime() - Date.now() < 5 * 60 * 1000;
 
     if (needsRefresh) {
+      logger.debug(`Token for ${emailAddress} needs refresh (expiry: ${expiresAt.toISOString()})`);
       const refreshToken = await decryptToken(
         mailAccount.refresh_token_encrypted,
         ENCRYPTION_KEY,
@@ -132,7 +135,9 @@ Deno.serve(async (req: Request) => {
 
   let newMessages: Array<{ id: string; threadId: string }> = [];
   try {
+    logger.debug(`Fetching history for ${emailAddress} starting at ${startHistoryId}`);
     newMessages = await getHistoryMessages(accessToken, startHistoryId);
+    logger.debug(`Found ${newMessages.length} new messages in history`);
   } catch (err) {
     logger.error("History fetch error:", err);
     // Still update history_id so we don't re-process old messages next time

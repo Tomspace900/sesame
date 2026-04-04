@@ -6,7 +6,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { handleCors } from "../_shared/cors.ts";
 import { jsonError, jsonSuccess } from "../_shared/response.ts";
 import { decryptToken, encryptToken } from "../_shared/crypto.ts";
-import { listMessages, refreshAccessToken } from "../_shared/gmail.ts";
+import { listMessages, getMessageDate, refreshAccessToken } from "../_shared/gmail.ts";
 import { createLogger } from "../_shared/logger.ts";
 const logger = createLogger("start-backfill");
 
@@ -173,13 +173,29 @@ Deno.serve(async (req: Request) => {
 
     if (result.messages.length === 0) break;
 
-    const queueItems = result.messages.slice(0, remaining).map((msg) => ({
-      user_id: user.id,
-      mail_account_id: mailAccount.id,
-      provider_message_id: msg.id,
-      priority: 0, // Backfill = low priority
-      status: "pending",
-    }));
+    const batch = result.messages.slice(0, remaining);
+
+    // Fetch internalDate pour chaque message afin de trier oldest-first dans la queue.
+    // N+1 léger : format=metadata&fields=internalDate (pas de body).
+    const queueItems = await Promise.all(
+      batch.map(async (msg) => {
+        let receivedAt: string | null = null;
+        try {
+          const d = await getMessageDate(accessToken, msg.id);
+          receivedAt = d.toISOString();
+        } catch {
+          // Non bloquant : received_at restera null, fallback sur created_at
+        }
+        return {
+          user_id: user.id,
+          mail_account_id: mailAccount.id,
+          provider_message_id: msg.id,
+          priority: 0, // Backfill = low priority
+          status: "pending",
+          received_at: receivedAt,
+        };
+      }),
+    );
 
     const { error: queueError } = await supabase
       .from("processing_queue")

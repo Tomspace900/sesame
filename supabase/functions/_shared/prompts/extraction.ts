@@ -4,7 +4,7 @@
 // Suppression du linking Gemini : extraction pure uniquement.
 // Le linking est désormais déterministe via la table dossier_identifiers.
 
-export const EXTRACTION_PROMPT_VERSION = "4.0.0";
+export const EXTRACTION_PROMPT_VERSION = "5.0.0";
 
 // Helper: suggest dossier_type from classification's email_type
 function getTypeSuggestion(emailType: string): string {
@@ -39,8 +39,11 @@ export function buildExtractionPrompt(params: {
   sender: string;
   receivedAt: string;
   emailType: string;
+  hasAttachments?: boolean;
 }): string {
   const typeSuggestion = getTypeSuggestion(params.emailType);
+  // Gemini Flash a 1M tokens de contexte — on ne tronque qu'à 30 000 chars pour les mails exceptionnellement longs
+  const body = params.emailBody.slice(0, 30000);
 
   return `Tu es l'assistant d'extraction de données de Sésame, un coffre-fort personnel intelligent.
 Analyse ce mail transactionnel et extrais les informations structurées.
@@ -51,7 +54,7 @@ SUJET: ${params.subject}
 RECU LE: ${params.receivedAt}
 TYPE CLASSIFIE: ${params.emailType}
 CORPS DU MAIL:
-${params.emailBody.slice(0, 8000)}
+${body}
 ---
 
 ## EXTRACTION
@@ -188,7 +191,21 @@ Pour **booking**, extracted_data doit contenir :
 - arrival_location: string | null (pour VTC/taxi uniquement : destination)
 - action_links: [{type, label, url}] (types: "manage_booking", "cancel")
 
-### RÈGLES STRICTES :
+${params.hasAttachments ? `### PIÈCES JOINTES
+
+Des pièces jointes sont incluses dans ce mail. Analyse-les pour en extraire les identifiants et données structurées AU MÊME TITRE que le corps du mail.
+
+Les factures et confirmations en pièce jointe contiennent souvent :
+- Le numéro de commande original (order_ref) qui peut ne pas apparaître dans le body
+- Le numéro de facture (invoice_number)
+- Le montant exact
+- Les détails produit
+
+Un identifiant trouvé dans une pièce jointe a la MÊME valeur qu'un identifiant trouvé dans le body. Extrais-les tous dans le tableau "identifiers".
+
+---
+
+` : ""}### RÈGLES STRICTES :
 - action_links : inclure UNIQUEMENT si l'URL est présente et complète dans le mail. Si pas d'URL → ne pas inclure.
 - check_in_time / check_out_time : format "HH:MM" (ex: "15:00"), JAMAIS en ISO 8601.
 - Toutes les autres dates : format ISO 8601 complet (ex: "2026-03-15T14:30:00Z").

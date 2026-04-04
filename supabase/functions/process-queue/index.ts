@@ -7,8 +7,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // deno-lint-ignore no-import-prefix
 import { z } from "npm:zod@3";
 import { decryptToken, encryptToken } from "../_shared/crypto.ts";
-import { callGemini, extractJson } from "../_shared/gemini.ts";
-import { getMessage, refreshAccessToken } from "../_shared/gmail.ts";
+import { callGemini, callGeminiWithParts, type GeminiPart, extractJson, GEMINI_MODELS } from "../_shared/gemini.ts";
+import { getMessage, fetchAttachment, type AttachmentMeta, refreshAccessToken } from "../_shared/gmail.ts";
 import { createLogger } from "../_shared/logger.ts";
 import { buildClassificationPrompt } from "../_shared/prompts/classification.ts";
 import { buildExtractionPrompt } from "../_shared/prompts/extraction.ts";
@@ -429,6 +429,7 @@ async function processItem(queueItem: {
 }): Promise<void> {
   // 1. Get mail account and ensure valid token
   logger.info(`Fetching mail account for item ${queueItem.id}`);
+  logger.debug(`Lookup in mail_accounts table for id=${queueItem.mail_account_id}...`);
   const { data: mailAccount, error: accountError } = await supabase
     .from("mail_accounts")
     .select("id, access_token_encrypted, refresh_token_encrypted, token_expires_at")
@@ -440,9 +441,12 @@ async function processItem(queueItem: {
   const expiresAt = mailAccount.token_expires_at
     ? new Date(mailAccount.token_expires_at)
     : new Date(0);
+  
+  logger.debug(`Token expires at ${expiresAt.toISOString()} (Current: ${new Date().toISOString()})`);
   let accessToken: string;
 
   if (expiresAt.getTime() - Date.now() < 5 * 60 * 1000) {
+    logger.debug(`Token expired or expiring soon, refreshing access token...`);
     const refreshToken = await decryptToken(mailAccount.refresh_token_encrypted, ENCRYPTION_KEY);
     const refreshed = await refreshAccessToken(
       refreshToken,
@@ -458,7 +462,9 @@ async function processItem(queueItem: {
         token_expires_at: refreshed.expires_at.toISOString(),
       })
       .eq("id", mailAccount.id);
+    logger.debug(`Token refreshed and saved. New expiry: ${refreshed.expires_at.toISOString()}`);
   } else {
+    logger.debug(`Token is still valid, decrypting existing token...`);
     accessToken = await decryptToken(mailAccount.access_token_encrypted, ENCRYPTION_KEY);
   }
 
@@ -488,6 +494,8 @@ async function processItem(queueItem: {
     .select("id")
     .single();
 
+  logger.debug(`Email upsert result: emailId=${emailRecord?.id ?? 'none'}, error=${emailError ? emailError.message : 'none'}`);
+
   if (emailError || !emailRecord) {
     throw new Error(`Email upsert failed: ${JSON.stringify(emailError)}`);
   }
@@ -503,6 +511,7 @@ async function processItem(queueItem: {
         upsert: true,
       });
 
+    logger.debug(`HTML upload to Storage at ${htmlPath}: error=${storageError ? storageError.message : 'none'}`);
     if (!storageError) {
       await supabase.from("emails").update({ text_html_storage_path: htmlPath }).eq("id", emailId);
     }
@@ -510,13 +519,17 @@ async function processItem(queueItem: {
 
   // 5. Build email body for Gemini (prefer plain text, fallback to html-to-text)
   const emailBody = rawEmail.textPlain ?? (rawEmail.textHtml ? htmlToText(rawEmail.textHtml) : "");
-  const bodyPreview = emailBody.slice(0, 1500);
+  logger.debug(`Extracted email body length: ${emailBody.length} characters`);
+  const bodyPreview = emailBody.slice(0, 3000);
 
   // 6. Regex identifier extraction — filet de sécurité complémentaire
   const regexIdentifiers = extractIdentifiersFromSubject(rawEmail.subject ?? "");
+  if (regexIdentifiers.length > 0) {
+    logger.debug(`Regex identifiers found in subject: ${JSON.stringify(regexIdentifiers)}`);
+  }
 
   // 7. Classification
-  logger.info(`Asking Gemini to classify email...`);
+  logger.ai(`Asking Gemini to classify email...`);
   const classificationPrompt = buildClassificationPrompt({
     subject: rawEmail.subject,
     sender: rawEmail.sender,
@@ -525,7 +538,7 @@ async function processItem(queueItem: {
 
   let classificationRaw: string;
   try {
-    classificationRaw = await callGemini(GEMINI_API_KEY, classificationPrompt);
+    classificationRaw = await callGemini(GEMINI_API_KEY, classificationPrompt, GEMINI_MODELS.classification);
   } catch (err) {
     throw new Error(`Gemini classification failed: ${err}`);
   }
@@ -538,9 +551,10 @@ async function processItem(queueItem: {
   }
 
   const classification = classificationParsed.data;
-  logger.info(
-    `Classification: transactional=${classification.is_transactional}, confidence=${classification.confidence}`
+  logger.ai(
+    `Classification: transactional=${classification.is_transactional}, type=${classification.email_type}, confidence=${classification.confidence}`
   );
+  logger.debug(`Gemini classification reason: ${classification.reason}`);
 
   // 8. Update email classification + store raw response
   await supabase
@@ -551,6 +565,7 @@ async function processItem(queueItem: {
       raw_classification_response: classificationJson,
     })
     .eq("id", emailId);
+  logger.debug(`Saved classification result to db for email ${emailId}`);
 
   // 9. If not transactional, skip
   if (!classification.is_transactional) {
@@ -566,28 +581,38 @@ async function processItem(queueItem: {
     return;
   }
 
-  // 10. Find merchant by sender
-  let merchantId: string | null = null;
-  let merchantDefaults: {
-    default_return_days: number | null;
-    default_warranty_months: number | null;
-  } | null = null;
+  // 10. Fetch processable attachments (only for transactional emails, before extraction)
+  const PROCESSABLE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+  const MAX_ATTACHMENT_SIZE = 2 * 1024 * 1024; // 2MB
 
-  const { data: merchantRows } = (await supabase.rpc("find_merchant_by_sender", {
-    sender_email: rawEmail.sender,
-  })) as {
-    data: Array<{
-      id: string;
-      default_return_days: number | null;
-      default_warranty_months: number | null;
-    }> | null;
-    error: unknown;
-  };
+  type FetchedAttachment = { filename: string; mimeType: string; base64: string };
+  const fetchedAttachments: FetchedAttachment[] = [];
 
-  const foundMerchant = merchantRows?.[0] ?? null;
-  if (foundMerchant) {
-    merchantId = foundMerchant.id;
-    merchantDefaults = foundMerchant;
+  if (rawEmail.attachments.length > 0) {
+    const processable = rawEmail.attachments
+      .filter((att: AttachmentMeta) => {
+        const nameLower = att.filename.toLowerCase();
+        return (
+          PROCESSABLE_MIME_TYPES.includes(att.mimeType) &&
+          att.size <= MAX_ATTACHMENT_SIZE &&
+          !nameLower.includes("logo") &&
+          !nameLower.includes("signature") &&
+          !nameLower.includes("banner")
+        );
+      })
+      .slice(0, 3); // max 3 pièces jointes
+      
+    logger.debug(`Found ${processable.length} processable attachments out of ${rawEmail.attachments.length} total`);
+
+    for (const att of processable) {
+      try {
+        const base64 = await fetchAttachment(accessToken, queueItem.provider_message_id, att.attachmentId);
+        fetchedAttachments.push({ filename: att.filename, mimeType: att.mimeType, base64 });
+        logger.info(`Fetched attachment: ${att.filename} (${att.mimeType}, ${att.size} bytes)`);
+      } catch (err) {
+        logger.warn(`Failed to fetch attachment ${att.filename}:`, err);
+      }
+    }
   }
 
   // 11. Extraction — extraction pure, sans contexte de dossiers
@@ -597,9 +622,17 @@ async function processItem(queueItem: {
     sender: rawEmail.sender,
     receivedAt: rawEmail.receivedAt.toISOString(),
     emailType: classification.email_type ?? "other",
+    hasAttachments: fetchedAttachments.length > 0,
   });
 
-  logger.info(`Sending extraction prompt to Gemini...`);
+  // Construire les parts multimodales : texte + pièces jointes si présentes
+  const extractionParts: GeminiPart[] = [{ text: extractionPrompt }];
+  for (const att of fetchedAttachments) {
+    extractionParts.push({ text: `\n--- PIÈCE JOINTE : ${att.filename} ---\n` });
+    extractionParts.push({ inlineData: { mimeType: att.mimeType, data: att.base64 } });
+  }
+
+  logger.ai(`Sending extraction prompt to Gemini (${fetchedAttachments.length} attachment(s))...`);
 
   let extraction: ExtractionResult | null = null;
   let rawExtractionResponse: unknown = null;
@@ -607,7 +640,7 @@ async function processItem(queueItem: {
   for (let attempt = 0; attempt < 2; attempt++) {
     let raw: string;
     try {
-      raw = await callGemini(GEMINI_API_KEY, extractionPrompt);
+      raw = await callGeminiWithParts(GEMINI_API_KEY, extractionParts, GEMINI_MODELS.extraction);
     } catch {
       continue;
     }
@@ -618,11 +651,12 @@ async function processItem(queueItem: {
 
     if (parsed.success) {
       extraction = parsed.data;
-      logger.success(
+      logger.ai(
         `Extraction OK (attempt ${
           attempt + 1
         }), type=${extraction.dossier_type}, identifiers=${extraction.identifiers.length}`
       );
+      logger.debug(`Extracted raw JSON: ${JSON.stringify(extraction)}`);
       break;
     }
 
@@ -656,17 +690,91 @@ async function processItem(queueItem: {
     }
   }
 
-  // 13. Complete merchant lookup if not found by sender
-  if (extraction && !merchantId && extraction.extracted_data.merchant_name) {
-    const { data: byName } = await supabase
-      .from("merchants")
-      .select("id, default_return_days, default_warranty_months")
-      .ilike("canonical_name", extraction.extracted_data.merchant_name as string)
-      .maybeSingle();
+  // 13. Résolution merchant POST-extraction
+  //     a. Par nom extrait par Gemini (prioritaire — évite Google Reserve → Google Cloud)
+  //     b. Fallback par sender email pattern
+  //     c. Auto-create si toujours null et qu'on a un nom
 
-    if (byName) {
-      merchantId = byName.id as string;
-      merchantDefaults = byName as typeof merchantDefaults;
+  type MerchantRow = {
+    id: string;
+    default_return_days: number | null;
+    default_warranty_months: number | null;
+  };
+
+  let merchantId: string | null = null;
+  let merchantDefaults: {
+    default_return_days: number | null;
+    default_warranty_months: number | null;
+  } | null = null;
+
+  if (extraction) {
+    const merchantName = (extraction.extracted_data.merchant_name as string | null | undefined) ?? null;
+
+    // a. Lookup par nom canonique (case-insensitive)
+    if (merchantName) {
+      const { data: byName } = await supabase
+        .from("merchants")
+        .select("id, default_return_days, default_warranty_months")
+        .ilike("canonical_name", merchantName)
+        .maybeSingle();
+
+      if (byName) {
+        merchantId = (byName as MerchantRow).id;
+        merchantDefaults = byName as MerchantRow;
+      }
+    }
+
+    // b. Fallback par sender email pattern
+    if (!merchantId) {
+      const { data: bySender } = (await supabase.rpc("find_merchant_by_sender", {
+        sender_email: rawEmail.sender,
+      })) as { data: MerchantRow[] | null; error: unknown };
+
+      const foundBySender = bySender?.[0] ?? null;
+      if (foundBySender) {
+        merchantId = foundBySender.id;
+        merchantDefaults = foundBySender;
+      }
+    }
+
+    // c. Auto-create merchant depuis le nom extrait par Gemini
+    if (!merchantId && merchantName) {
+      const categoryFromType: Record<string, string> = {
+        purchase: "ecommerce",
+        travel: "travel",
+        accommodation: "accommodation",
+        subscription: "subscription",
+        booking: "other",
+      };
+      const inferredCategory = categoryFromType[extraction.dossier_type] ?? "other";
+
+      const { data: created, error: createError } = await supabase
+        .from("merchants")
+        .insert({
+          canonical_name: merchantName,
+          known_sender_patterns: rawEmail.sender ? [rawEmail.sender] : [],
+          category: inferredCategory,
+        })
+        .select("id, default_return_days, default_warranty_months")
+        .single();
+
+      if (created && !createError) {
+        merchantId = (created as MerchantRow).id;
+        merchantDefaults = created as MerchantRow;
+        logger.info(`Auto-created merchant "${merchantName}" (${inferredCategory})`);
+      } else {
+        // Conflit de contrainte unique (création concurrente) → fetch l'existant
+        const { data: existing } = await supabase
+          .from("merchants")
+          .select("id, default_return_days, default_warranty_months")
+          .ilike("canonical_name", merchantName)
+          .maybeSingle();
+
+        if (existing) {
+          merchantId = (existing as MerchantRow).id;
+          merchantDefaults = existing as MerchantRow;
+        }
+      }
     }
   }
 
@@ -808,7 +916,11 @@ async function processItem(queueItem: {
     .eq("id", queueItem.id);
   await updateBackfillProgress(queueItem.mail_account_id);
 
-  const linkStatus = isNew ? "new dossier" : wasMerged ? "linked (merged)" : "linked (identifier)";
+  const linkStatus = isNew
+    ? "new dossier"
+    : wasMerged
+    ? "linked (merged)"
+    : "linked (identifier or merchant_temporal)";
   logger.success(`Successfully processed email ${emailId} → dossier ${dossierId} (${linkStatus})`);
 }
 

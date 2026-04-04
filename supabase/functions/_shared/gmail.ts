@@ -1,5 +1,12 @@
 // Gmail API client for Supabase Edge Functions
 
+export type AttachmentMeta = {
+  filename: string;
+  mimeType: string;
+  size: number;
+  attachmentId: string;
+};
+
 export type RawEmail = {
   providerMessageId: string;
   subject: string;
@@ -9,6 +16,7 @@ export type RawEmail = {
   textPlain: string | null;
   textHtml: string | null;
   hasAttachments: boolean;
+  attachments: AttachmentMeta[]; // pièces jointes fetchables (avec attachmentId)
 };
 
 export type GmailMessage = { id: string; threadId: string };
@@ -148,6 +156,53 @@ export async function getMessage(
 }
 
 // ---------------------------------------------------------------------------
+// Fetch a single attachment (returns base64url-encoded content)
+// ---------------------------------------------------------------------------
+
+export async function fetchAttachment(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<string> {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Attachment fetch failed (${res.status}): ${body}`);
+  }
+
+  const data = await res.json() as { data: string };
+  // Gmail returns base64url; Gemini inlineData expects standard base64
+  return data.data.replace(/-/g, "+").replace(/_/g, "/");
+}
+
+// ---------------------------------------------------------------------------
+// Get internalDate of a single message (lightweight — format=metadata)
+// Used by start-backfill to populate received_at without fetching the full body.
+// ---------------------------------------------------------------------------
+
+export async function getMessageDate(
+  accessToken: string,
+  messageId: string,
+): Promise<Date> {
+  const res = await fetch(
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=metadata&fields=internalDate`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`getMessageDate failed (${res.status}): ${body}`);
+  }
+
+  const data = await res.json() as { internalDate: string };
+  return new Date(parseInt(data.internalDate, 10));
+}
+
+// ---------------------------------------------------------------------------
 // List messages (for backfill)
 // ---------------------------------------------------------------------------
 
@@ -216,6 +271,7 @@ function parseGmailMessage(msg: Record<string, any>): RawEmail {
   let textPlain: string | null = null;
   let textHtml: string | null = null;
   let hasAttachments = false;
+  const attachments: AttachmentMeta[] = [];
 
   // deno-lint-ignore no-explicit-any
   const extractParts = (payload: Record<string, any>) => {
@@ -227,12 +283,20 @@ function parseGmailMessage(msg: Record<string, any>): RawEmail {
       textPlain = decodeBase64Url(bodyData);
     } else if (mimeType === "text/html" && bodyData && !textHtml) {
       textHtml = decodeBase64Url(bodyData);
+    } else if (payload.filename && payload.body?.attachmentId) {
+      // Pièce jointe fetchable (a un attachmentId)
+      hasAttachments = true;
+      attachments.push({
+        filename: payload.filename as string,
+        mimeType,
+        size: (payload.body?.size as number | undefined) ?? 0,
+        attachmentId: payload.body.attachmentId as string,
+      });
     } else if (
       payload.filename &&
-      (mimeType.startsWith("application/") ||
-        mimeType.startsWith("image/") ||
-        payload.body?.attachmentId)
+      (mimeType.startsWith("application/") || mimeType.startsWith("image/"))
     ) {
+      // Pièce jointe inline sans attachmentId (ex: petites images inline)
       hasAttachments = true;
     }
 
@@ -254,6 +318,7 @@ function parseGmailMessage(msg: Record<string, any>): RawEmail {
     textPlain,
     textHtml,
     hasAttachments,
+    attachments,
   };
 }
 
