@@ -69,13 +69,13 @@ export function DossierDetailPage(): React.JSX.Element {
       const { data, error } = await supabase
         .from("dossier_events")
         .select(
-          "id, event_type, human_summary, extracted_data, extraction_confidence, created_at, email_id"
+          "id, event_type, human_summary, extracted_data, extraction_confidence, created_at, email_id, emails(received_at)"
         )
         .eq("dossier_id", id)
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as TimelineEvent[];
+      return (data ?? []) as unknown as TimelineEvent[];
     },
     enabled: !!id && !!user,
   });

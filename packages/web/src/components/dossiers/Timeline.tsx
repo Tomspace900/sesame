@@ -18,6 +18,9 @@ export type TimelineEvent = {
   extraction_confidence: number | null;
   created_at: string;
   email_id: string;
+  emails?: {
+    received_at: string;
+  } | null;
 };
 
 const EVENT_ICONS: Partial<Record<string, IconSvgElement>> = {
@@ -79,7 +82,7 @@ function EventItem({
                     {event.human_summary ?? event.event_type}
                   </p>
                   <p className="font-body text-xs text-sesame-text-muted mt-0.5">
-                    {formatShortDate(event.created_at)}
+                    {formatShortDate(event.emails?.received_at ?? event.created_at)}
                   </p>
                 </div>
                 {!isMajor && icon && <Icon icon={icon} size={16} color="#7A7065" aria-hidden />}
@@ -129,7 +132,9 @@ export function Timeline({ events }: TimelineProps): React.JSX.Element {
   }
 
   const sorted = [...events].sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    (a, b) =>
+      new Date(b.emails?.received_at ?? b.created_at).getTime() -
+      new Date(a.emails?.received_at ?? a.created_at).getTime()
   );
 
   return (
