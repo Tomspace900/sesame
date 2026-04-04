@@ -22,11 +22,11 @@ export async function refreshAccessToken(
   clientId: string,
   clientSecret: string,
 ): Promise<{ access_token: string; expires_at: Date }> {
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      grant_type: 'refresh_token',
+      grant_type: "refresh_token",
       refresh_token: refreshToken,
       client_id: clientId,
       client_secret: clientSecret,
@@ -53,14 +53,17 @@ export async function setupWatch(
   accessToken: string,
   topicName: string,
 ): Promise<{ historyId: string; expiration: Date }> {
-  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/watch', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
+  const res = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/watch",
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ topicName, labelIds: ["INBOX"] }),
     },
-    body: JSON.stringify({ topicName, labelIds: ['INBOX'] }),
-  });
+  );
 
   if (!res.ok) {
     const body = await res.text();
@@ -88,11 +91,11 @@ export async function getHistoryMessages(
   do {
     const params = new URLSearchParams({
       startHistoryId,
-      historyTypes: 'messageAdded',
-      labelId: 'INBOX',
-      maxResults: '100',
+      historyTypes: "messageAdded",
+      labelId: "INBOX",
+      maxResults: "100",
     });
-    if (pageToken) params.set('pageToken', pageToken);
+    if (pageToken) params.set("pageToken", pageToken);
 
     const res = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/history?${params}`,
@@ -153,9 +156,18 @@ export async function listMessages(
   query: string,
   pageToken?: string,
   maxResults = 50,
-): Promise<{ messages: GmailMessage[]; nextPageToken?: string; resultSizeEstimate?: number }> {
-  const params = new URLSearchParams({ q: query, maxResults: String(maxResults) });
-  if (pageToken) params.set('pageToken', pageToken);
+): Promise<
+  {
+    messages: GmailMessage[];
+    nextPageToken?: string;
+    resultSizeEstimate?: number;
+  }
+> {
+  const params = new URLSearchParams({
+    q: query,
+    maxResults: String(maxResults),
+  });
+  if (pageToken) params.set("pageToken", pageToken);
 
   const res = await fetch(
     `https://gmail.googleapis.com/gmail/v1/users/me/messages?${params}`,
@@ -186,13 +198,15 @@ export async function listMessages(
 
 // deno-lint-ignore no-explicit-any
 function parseGmailMessage(msg: Record<string, any>): RawEmail {
-  const headers: Array<{ name: string; value: string }> = msg.payload?.headers ?? [];
+  const headers: Array<{ name: string; value: string }> =
+    msg.payload?.headers ?? [];
 
   const getHeader = (name: string) =>
-    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? '';
+    headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ??
+      "";
 
-  const subject = getHeader('Subject');
-  const from = getHeader('From');
+  const subject = getHeader("Subject");
+  const from = getHeader("From");
 
   // Parse "Display Name <email@domain.com>" or plain "email@domain.com"
   const fromMatch = from.match(/^(.+?)\s*<([^>]+)>$/);
@@ -205,18 +219,18 @@ function parseGmailMessage(msg: Record<string, any>): RawEmail {
 
   // deno-lint-ignore no-explicit-any
   const extractParts = (payload: Record<string, any>) => {
-    const mimeType: string = payload.mimeType ?? '';
+    const mimeType: string = payload.mimeType ?? "";
     const bodyData: string | undefined = payload.body?.data;
     const parts: Record<string, unknown>[] | undefined = payload.parts;
 
-    if (mimeType === 'text/plain' && bodyData && !textPlain) {
+    if (mimeType === "text/plain" && bodyData && !textPlain) {
       textPlain = decodeBase64Url(bodyData);
-    } else if (mimeType === 'text/html' && bodyData && !textHtml) {
+    } else if (mimeType === "text/html" && bodyData && !textHtml) {
       textHtml = decodeBase64Url(bodyData);
     } else if (
       payload.filename &&
-      (mimeType.startsWith('application/') ||
-        mimeType.startsWith('image/') ||
+      (mimeType.startsWith("application/") ||
+        mimeType.startsWith("image/") ||
         payload.body?.attachmentId)
     ) {
       hasAttachments = true;
@@ -244,15 +258,17 @@ function parseGmailMessage(msg: Record<string, any>): RawEmail {
 }
 
 function decodeBase64Url(data: string): string {
-  const base64 = data.replace(/-/g, '+').replace(/_/g, '/');
+  const base64 = data.replace(/-/g, "+").replace(/_/g, "/");
   const padding = (4 - (base64.length % 4)) % 4;
-  const padded = base64 + '='.repeat(padding);
+  const padded = base64 + "=".repeat(padding);
 
   try {
     const binary = atob(padded);
     // Attempt UTF-8 decode via percent-encoding
     return decodeURIComponent(
-      binary.split('').map((c) => '%' + c.charCodeAt(0).toString(16).padStart(2, '0')).join(''),
+      binary.split("").map((c) =>
+        "%" + c.charCodeAt(0).toString(16).padStart(2, "0")
+      ).join(""),
     );
   } catch {
     // Fallback: return as-is (may contain non-UTF8 chars)

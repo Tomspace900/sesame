@@ -9,7 +9,7 @@ async function sleep(ms: number): Promise<void> {
 export async function callGemini(
   apiKey: string,
   prompt: string,
-  model = "gemini-2.5-flash"
+  model = "gemini-2.5-flash",
 ): Promise<string> {
   const url = `${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`;
 
@@ -32,8 +32,12 @@ export async function callGemini(
 
     if (!res.ok) {
       const body = await res.text();
-      console.error(`Gemini attempt ${attempt + 1} failed (${res.status}): ${body}`);
-      if (attempt === 2) throw new Error(`Gemini API error (${res.status}): ${body}`);
+      console.error(
+        `Gemini attempt ${attempt + 1} failed (${res.status}): ${body}`,
+      );
+      if (attempt === 2) {
+        throw new Error(`Gemini API error (${res.status}): ${body}`);
+      }
       continue;
     }
 

@@ -9,22 +9,32 @@ function hexToBytes(hex: string): Uint8Array {
   return bytes;
 }
 
-async function importKey(hexKey: string, usage: KeyUsage[]): Promise<CryptoKey> {
+async function importKey(
+  hexKey: string,
+  usage: KeyUsage[],
+): Promise<CryptoKey> {
   return crypto.subtle.importKey(
-    'raw',
+    "raw",
     hexToBytes(hexKey),
-    { name: 'AES-GCM' },
+    { name: "AES-GCM" },
     false,
     usage,
   );
 }
 
-export async function encryptToken(plaintext: string, hexKey: string): Promise<string> {
-  const key = await importKey(hexKey, ['encrypt']);
+export async function encryptToken(
+  plaintext: string,
+  hexKey: string,
+): Promise<string> {
+  const key = await importKey(hexKey, ["encrypt"]);
   const iv = crypto.getRandomValues(new Uint8Array(12)); // 96-bit IV for AES-GCM
   const encoded = new TextEncoder().encode(plaintext);
 
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, encoded);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoded,
+  );
 
   // Prepend IV (12 bytes) + ciphertext, base64-encode
   const combined = new Uint8Array(12 + ciphertext.byteLength);
@@ -34,13 +44,20 @@ export async function encryptToken(plaintext: string, hexKey: string): Promise<s
   return btoa(String.fromCharCode(...combined));
 }
 
-export async function decryptToken(encrypted: string, hexKey: string): Promise<string> {
-  const key = await importKey(hexKey, ['decrypt']);
+export async function decryptToken(
+  encrypted: string,
+  hexKey: string,
+): Promise<string> {
+  const key = await importKey(hexKey, ["decrypt"]);
   const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0));
 
   const iv = combined.slice(0, 12);
   const ciphertext = combined.slice(12);
 
-  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    ciphertext,
+  );
   return new TextDecoder().decode(plaintext);
 }

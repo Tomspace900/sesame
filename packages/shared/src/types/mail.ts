@@ -25,11 +25,11 @@ export type BackfillOptions = {
   senderPatterns?: string[];
 };
 
-export interface IMailProvider {
+export type IMailProvider = {
   readonly providerId: "gmail" | "yahoo" | "outlook";
   setupWatch(userId: string): Promise<void>;
   renewWatch(userId: string): Promise<void>;
   fetchNewEmails(userId: string, since: Date): Promise<RawEmail[]>;
   fetchEmailById(userId: string, emailId: string): Promise<RawEmail | null>;
   fetchHistory(userId: string, options: BackfillOptions): AsyncGenerator<RawEmail>;
-}
+};

@@ -56,7 +56,11 @@ export type ClassificationType = (typeof CLASSIFICATION_TYPES)[number];
 export const QUEUE_STATUSES = ["pending", "processing", "done", "error", "skipped"] as const;
 export type QueueStatus = (typeof QUEUE_STATUSES)[number];
 
-export const LINKED_BY_TYPES = ["reference", "fuzzy_match", "manual", "llm"] as const;
+export const LINKED_BY_TYPES = [
+  "identifier",  // match par dossier_identifiers (linking déterministe)
+  "merge",       // fusionné via mergeOnCollision
+  "manual",      // lien manuel par l'utilisateur
+] as const;
 export type LinkedByType = (typeof LINKED_BY_TYPES)[number];
 
 export const SUBSCRIPTION_PERIODS = ["monthly", "yearly", "weekly", "other"] as const;

@@ -1,6 +1,6 @@
 // Edge Function: process-queue (Cron */2 min)
 // Dequeues one pending item, fetches the email, classifies and extracts with Gemini,
-// then inserts or updates dossiers + dossier_events.
+// then delegates ALL persistence to the process_email_result RPC (atomic transaction).
 
 // deno-lint-ignore no-import-prefix
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -9,9 +9,10 @@ import { z } from "npm:zod@3";
 import { decryptToken, encryptToken } from "../_shared/crypto.ts";
 import { callGemini, extractJson } from "../_shared/gemini.ts";
 import { getMessage, refreshAccessToken } from "../_shared/gmail.ts";
+import { createLogger } from "../_shared/logger.ts";
 import { buildClassificationPrompt } from "../_shared/prompts/classification.ts";
 import { buildExtractionPrompt } from "../_shared/prompts/extraction.ts";
-import type { RecentDossierContext } from "../_shared/prompts/extraction.ts";
+const logger = createLogger("process-queue");
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -77,29 +78,29 @@ const ExtractedDataSchema = z.object({
   subscription_amount: z.number().nullish(),
   subscription_period: z.enum(["monthly", "yearly", "weekly", "other"]).nullish(),
   // Gemini sometimes returns objects instead of strings — coerce to strings
-  participants: z.array(z.unknown()).default([]).transform(
-    (arr: unknown[]) => arr.map((p: unknown) => (typeof p === 'string' ? p : JSON.stringify(p))),
-  ),
+  participants: z
+    .array(z.unknown())
+    .default([])
+    .transform((arr: unknown[]) =>
+      arr.map((p: unknown) => (typeof p === "string" ? p : JSON.stringify(p)))
+    ),
   action_links: z.array(ActionLinkSchema).default([]),
 });
 
+const IdentifierSchema = z.object({
+  type: z.string(),
+  value: z.string(),
+});
+
 const ExtractionSchema = z.object({
-  dossier_type: z.enum([
-    "purchase",
-    "travel",
-    "accommodation",
-    "subscription",
-    "booking",
-    "other",
-  ]).transform((v: string) => v === "other" ? "purchase" : v), // C7: never use "other", fallback to purchase
+  dossier_type: z
+    .enum(["purchase", "travel", "accommodation", "subscription", "booking", "other"])
+    .transform((v: string) => (v === "other" ? "purchase" : v)), // never use "other", fallback to purchase
   event_type: z.string(),
   extracted_data: ExtractedDataSchema,
+  identifiers: z.array(IdentifierSchema).default([]),
   human_summary: z.string(),
   extraction_confidence: z.number().min(0).max(1),
-  existing_dossier_id: z.string().uuid().nullable().catch(null),
-  // Gemini sometimes returns unexpected values like "started_at" — catch and nullify
-  linked_by: z.enum(["reference", "fuzzy_match", "llm"]).nullable().catch(null),
-  match_confidence: z.number().min(0).max(1).nullable(),
 });
 
 type ExtractionResult = z.infer<typeof ExtractionSchema>;
@@ -113,7 +114,7 @@ type ExtractionResult = z.infer<typeof ExtractionSchema>;
 function sanitizeJson(raw: string): string {
   // Replace control characters except tab, newline, carriage return
   // deno-lint-ignore no-control-regex
-  return raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+  return raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
 }
 
 // Returns a valid ISO string or null. Used for dates (started_at, ended_at, etc.)
@@ -133,7 +134,6 @@ function toISO(val: string | null | undefined): string | null {
 // Returns null if invalid or "00:00" (midnight = likely missing data).
 function validateTimeFormat(val: string | null | undefined): string | null {
   if (!val) return null;
-  // Accept "HH:MM" or "H:MM"
   const match = val.match(/^(\d{1,2}):(\d{2})$/);
   if (!match) return null;
   const h = parseInt(match[1]);
@@ -141,7 +141,7 @@ function validateTimeFormat(val: string | null | undefined): string | null {
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
   // "00:00" is suspicious — likely absence of info, not actual midnight check-in
   if (h === 0 && m === 0) return null;
-  return `${h.toString().padStart(2, '0')}:${match[2]}`;
+  return `${h.toString().padStart(2, "0")}:${match[2]}`;
 }
 
 // Increment backfill_progress.processed and set status='done' when queue is empty.
@@ -155,7 +155,10 @@ async function updateBackfillProgress(mailAccountId: string): Promise<void> {
 
   if (acct?.backfill_status !== "running") return;
 
-  const prog = acct.backfill_progress as { processed: number; total: number | null } | null;
+  const prog = acct.backfill_progress as {
+    processed: number;
+    total: number | null;
+  } | null;
   const newProcessed = (prog?.processed ?? 0) + 1;
 
   const { count: remaining } = await supabase
@@ -167,7 +170,10 @@ async function updateBackfillProgress(mailAccountId: string): Promise<void> {
   await supabase
     .from("mail_accounts")
     .update({
-      backfill_progress: { processed: newProcessed, total: prog?.total ?? null },
+      backfill_progress: {
+        processed: newProcessed,
+        total: prog?.total ?? null,
+      },
       backfill_status: (remaining ?? 1) === 0 ? "done" : "running",
     })
     .eq("id", mailAccountId);
@@ -207,42 +213,13 @@ function eventTypeToStatus(eventType: string): string {
   return map[eventType] ?? "detected";
 }
 
-// Status hierarchy — higher rank = more advanced state.
-// Terminal states (cancelled, returned) have rank 99 and are never overridden.
-const STATUS_RANK: Record<string, number> = {
-  detected: 0,
-  confirmed: 1,
-  in_progress: 2,
-  completed: 3,
-  cancelled: 99,
-  returned: 99,
-};
-
-// Returns the status to apply given the current dossier status and the new status from the event.
-// Rules:
-//   - Terminal states (cancelled, returned) are ALWAYS applied — they override everything.
-//   - From a terminal state, nothing can override it (no re-activation).
-//   - Otherwise, only upgrade (new rank >= current rank).
-function resolveStatus(currentStatus: string | undefined, newStatus: string): string {
-  const isTerminalNew = newStatus === 'cancelled' || newStatus === 'returned';
-  const isTerminalCurrent = currentStatus === 'cancelled' || currentStatus === 'returned';
-
-  // Terminal events always win (cancellation overrides everything)
-  if (isTerminalNew) return newStatus;
-
-  // Current is terminal — keep it (don't re-activate a cancelled dossier with a shipping event)
-  if (isTerminalCurrent) return currentStatus!;
-
-  // Non-terminal: only upgrade
-  const newRank = STATUS_RANK[newStatus] ?? 0;
-  const curRank = currentStatus ? (STATUS_RANK[currentStatus] ?? 0) : 0;
-  return newRank >= curRank ? newStatus : currentStatus!;
-}
-
 function calculateDeadlines(
   dossierType: string,
   extracted: z.infer<typeof ExtractedDataSchema>,
-  merchant: { default_return_days: number | null; default_warranty_months: number | null } | null,
+  merchant: {
+    default_return_days: number | null;
+    default_warranty_months: number | null;
+  } | null,
   startedAt: string | null | undefined
 ): Partial<{
   return_deadline: string;
@@ -282,78 +259,107 @@ function calculateDeadlines(
 }
 
 // ---------------------------------------------------------------------------
-// C1: Pre-linking by reference — SQL lookup before Gemini
+// Regex identifier extraction — filet de sécurité complémentaire à Gemini
+// Pré-extrait les identifiants évidents depuis le sujet.
+// Source = 'regex' dans dossier_identifiers.
 // ---------------------------------------------------------------------------
 
-// Common words that should not be treated as reference codes
+// Mots communs à exclure des PNR regex
 const COMMON_WORDS = new Set([
-  'HELLO', 'TOTAL', 'MERCI', 'VOTRE', 'SUITE', 'EMAIL', 'ORDER', 'PARIS',
-  'PRICE', 'COLIS', 'TRACK', 'CLICK', 'REPLY', 'VENIR', 'GRAND', 'OFFRE',
-  'COMME', 'MONDE', 'NOTRE', 'ENTRE', 'FRANCE', 'THOMAS', 'MAISON', 'OBJET',
-  'TITRE', 'LIGNE', 'CARTE', 'COMPTE', 'RETOUR', 'SUIVI', 'ENVOI', 'RECU',
-  'POINT', 'RELAIS', 'ADRESSE', 'COMMANDE', 'LIVRAISON', 'CHECK', 'TRAIN',
-  'AVION', 'HOTEL', 'BILLET', 'VOYAGE', 'DEPART', 'ARRIVEE', 'GRATUIT',
-  'ALLER', 'HTTPS', 'DATES', 'TEXTE', 'PROMO',
+  "HELLO",
+  "TOTAL",
+  "MERCI",
+  "VOTRE",
+  "SUITE",
+  "EMAIL",
+  "ORDER",
+  "PARIS",
+  "PRICE",
+  "COLIS",
+  "TRACK",
+  "CLICK",
+  "REPLY",
+  "VENIR",
+  "GRAND",
+  "OFFRE",
+  "COMME",
+  "MONDE",
+  "NOTRE",
+  "ENTRE",
+  "FRANCE",
+  "THOMAS",
+  "MAISON",
+  "OBJET",
+  "TITRE",
+  "LIGNE",
+  "CARTE",
+  "COMPTE",
+  "RETOUR",
+  "SUIVI",
+  "ENVOI",
+  "RECU",
+  "POINT",
+  "RELAIS",
+  "ADRESSE",
+  "COMMANDE",
+  "LIVRAISON",
+  "CHECK",
+  "TRAIN",
+  "AVION",
+  "HOTEL",
+  "BILLET",
+  "VOYAGE",
+  "DEPART",
+  "ARRIVEE",
+  "GRATUIT",
+  "ALLER",
+  "HTTPS",
+  "DATES",
+  "TEXTE",
+  "PROMO",
 ]);
 
-// Extract potential reference/booking codes from subject + body preview
-function extractReferenceCandidates(subject: string, bodyPreview: string): string[] {
-  const candidates = new Set<string>();
-  const text = `${subject} ${bodyPreview}`;
+function extractIdentifiersFromSubject(
+  subject: string
+): Array<{ type: string; value: string; source: "regex" }> {
+  const results: Array<{ type: string; value: string; source: "regex" }> = [];
+  const seen = new Set<string>();
 
-  // Patterns for order references, booking codes, etc.
-  const patterns = [
-    // Explicit reference markers: "n°XXXXX", "ref XXXXX", "#XXXXX", "réf. XXXXX", "commande XXXXX"
-    /(?:n[°o]|ref\.?|réf\.?|#|commande|order|booking|réservation|confirmation)\s*[:.]?\s*([A-Z0-9]{5,20})/gi,
-    // Alphanumeric codes (must mix letters and digits): 9CB6OPJ77FG4C, AF1694
-    /\b([A-Z0-9]{6,20})\b/g,
-    // PNR-style codes (5-6 uppercase letters with consonant clusters): XLMSHR, KBKKHJF
-    /\b([A-Z]{5,7})\b/g,
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const ref = match[1].trim();
-      // Filter out noise
-      if (
-        ref.length >= 5 &&
-        ref.length <= 20 &&
-        !/^[0-9]{1,5}$/.test(ref) &&
-        !COMMON_WORDS.has(ref.toUpperCase())
-      ) {
-        candidates.add(ref);
-      }
+  function add(type: string, value: string) {
+    const key = `${type}:${value}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push({ type, value, source: "regex" });
     }
   }
 
-  return [...candidates];
-}
+  // Amazon order numbers: 123-1234567-1234567
+  for (const m of subject.matchAll(/\b(\d{3}-\d{7}-\d{7})\b/g)) {
+    if (m[1]) add("order_ref", m[1]);
+  }
 
-// Try to find an existing dossier matching one of the reference candidates
-async function preLinkByReference(
-  userId: string,
-  subject: string,
-  bodyPreview: string
-): Promise<{ dossierId: string; reference: string } | null> {
-  const candidates = extractReferenceCandidates(subject, bodyPreview);
-  if (candidates.length === 0) return null;
+  // PNR-style codes in subject: 5-7 uppercase letters (filtered against common words)
+  for (const m of subject.matchAll(/\b([A-Z]{5,7})\b/g)) {
+    const v = m[1];
+    if (v && !COMMON_WORDS.has(v)) add("pnr", v);
+  }
 
-  for (const ref of candidates) {
-    const { data } = await supabase
-      .from("dossiers")
-      .select("id")
-      .eq("user_id", userId)
-      .or(`reference.eq.${ref},booking_reference.eq.${ref}`)
-      .limit(1)
-      .maybeSingle();
-
-    if (data) {
-      return { dossierId: data.id as string, reference: ref };
+  // Alphanumeric refs with hyphens (must contain at least one digit AND one letter): ksfr-1005-5977219
+  for (const m of subject.matchAll(/\b([A-Z0-9]{3,10}(?:-[A-Z0-9]{3,10}){1,4})\b/gi)) {
+    const v = m[1]?.toUpperCase();
+    if (
+      v &&
+      /[A-Z]/.test(v) &&
+      /[0-9]/.test(v) && // mix letters + digits
+      v.length >= 8 &&
+      v.length <= 30 &&
+      !COMMON_WORDS.has(v)
+    ) {
+      add("order_ref", m[1] ?? ""); // keep original casing
     }
   }
 
-  return null;
+  return results;
 }
 
 // ---------------------------------------------------------------------------
@@ -373,20 +379,22 @@ async function processNextItem(): Promise<void> {
     error: unknown;
   };
 
-  if (dequeueError) throw new Error(`Dequeue error: ${JSON.stringify(dequeueError)}`);
+  if (dequeueError) {
+    throw new Error(`Dequeue error: ${JSON.stringify(dequeueError)}`);
+  }
   // RETURNS processing_queue (composite) → null queue becomes {id: null, ...} not null
   if (!queueItem?.id) {
-    console.log("Queue is empty, nothing to process");
+    logger.info("Queue is empty, nothing to process");
     return;
   }
 
-  console.log(`Processing queue item ${queueItem.id}, attempt ${queueItem.attempts}`);
+  logger.info(`Processing queue item ${queueItem.id}, attempt ${queueItem.attempts}`);
 
   try {
     await processItem(queueItem);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
-    console.error(`Processing failed for item ${queueItem.id}:`, errMsg);
+    logger.error(`Processing failed for item ${queueItem.id}:`, errMsg);
 
     if (queueItem.attempts >= 3) {
       await supabase
@@ -420,6 +428,7 @@ async function processItem(queueItem: {
   attempts: number;
 }): Promise<void> {
   // 1. Get mail account and ensure valid token
+  logger.info(`Fetching mail account for item ${queueItem.id}`);
   const { data: mailAccount, error: accountError } = await supabase
     .from("mail_accounts")
     .select("id, access_token_encrypted, refresh_token_encrypted, token_expires_at")
@@ -454,9 +463,11 @@ async function processItem(queueItem: {
   }
 
   // 2. Fetch full email from Gmail
+  logger.info(`Fetching email ${queueItem.provider_message_id} from Gmail...`);
   const rawEmail = await getMessage(accessToken, queueItem.provider_message_id);
+  logger.info(`Received email: ${rawEmail.subject}`);
 
-  // 3. Insert/upsert email record
+  // 3. Insert/upsert email record (idempotent)
   const { data: emailRecord, error: emailError } = await supabase
     .from("emails")
     .upsert(
@@ -477,8 +488,9 @@ async function processItem(queueItem: {
     .select("id")
     .single();
 
-  if (emailError || !emailRecord)
+  if (emailError || !emailRecord) {
     throw new Error(`Email upsert failed: ${JSON.stringify(emailError)}`);
+  }
   const emailId = emailRecord.id as string;
 
   // 4. Store HTML in Supabase Storage
@@ -498,10 +510,13 @@ async function processItem(queueItem: {
 
   // 5. Build email body for Gemini (prefer plain text, fallback to html-to-text)
   const emailBody = rawEmail.textPlain ?? (rawEmail.textHtml ? htmlToText(rawEmail.textHtml) : "");
-  // C8: increased from 500 to 1500 chars for better classification
   const bodyPreview = emailBody.slice(0, 1500);
 
-  // 6. Classification
+  // 6. Regex identifier extraction — filet de sécurité complémentaire
+  const regexIdentifiers = extractIdentifiersFromSubject(rawEmail.subject ?? "");
+
+  // 7. Classification
+  logger.info(`Asking Gemini to classify email...`);
   const classificationPrompt = buildClassificationPrompt({
     subject: rawEmail.subject,
     sender: rawEmail.sender,
@@ -523,8 +538,11 @@ async function processItem(queueItem: {
   }
 
   const classification = classificationParsed.data;
+  logger.info(
+    `Classification: transactional=${classification.is_transactional}, confidence=${classification.confidence}`
+  );
 
-  // 7. Update email classification + store raw response (C5: observability)
+  // 8. Update email classification + store raw response
   await supabase
     .from("emails")
     .update({
@@ -534,7 +552,7 @@ async function processItem(queueItem: {
     })
     .eq("id", emailId);
 
-  // 8. If not transactional, skip
+  // 9. If not transactional, skip
   if (!classification.is_transactional) {
     await supabase
       .from("processing_queue")
@@ -544,25 +562,17 @@ async function processItem(queueItem: {
       })
       .eq("id", queueItem.id);
     await updateBackfillProgress(queueItem.mail_account_id);
-    console.log(`Skipped non-transactional email ${emailId}`);
+    logger.info(`Skipped non-transactional email ${emailId}`);
     return;
   }
 
-  // 8.5 C1: Pre-link by reference — SQL lookup before Gemini
-  const preLink = await preLinkByReference(
-    queueItem.user_id,
-    rawEmail.subject,
-    emailBody.slice(0, 2000)
-  );
-
-  // 9. Find merchant early (needed for C2: merchant-specific dossier lookup)
+  // 10. Find merchant by sender
   let merchantId: string | null = null;
   let merchantDefaults: {
     default_return_days: number | null;
     default_warranty_months: number | null;
   } | null = null;
 
-  // find_merchant_by_sender returns RETURNS TABLE → Supabase gives back an array
   const { data: merchantRows } = (await supabase.rpc("find_merchant_by_sender", {
     sender_email: rawEmail.sender,
   })) as {
@@ -580,103 +590,20 @@ async function processItem(queueItem: {
     merchantDefaults = foundMerchant;
   }
 
-  // 10. C2: Get 30 recent active dossiers + merchant-specific dossiers for linking context
-  const { data: recentDossiers } = await supabase
-    .from("dossiers")
-    .select(`
-      id, dossier_type, title, reference, booking_reference, status, started_at,
-      merchants(canonical_name)
-    `)
-    .eq("user_id", queueItem.user_id)
-    .not("status", "in", '("cancelled","returned")')
-    .order("started_at", { ascending: false })
-    .limit(30);
-
-  // C2: Also fetch merchant-specific dossiers (may include older ones not in top 30)
-  let merchantDossiers: typeof recentDossiers = [];
-  if (merchantId) {
-    const { data } = await supabase
-      .from("dossiers")
-      .select(`
-        id, dossier_type, title, reference, booking_reference, status, started_at,
-        merchants(canonical_name)
-      `)
-      .eq("user_id", queueItem.user_id)
-      .eq("merchant_id", merchantId)
-      .not("status", "in", '("cancelled","returned")')
-      .order("started_at", { ascending: false })
-      .limit(10);
-    merchantDossiers = data ?? [];
-  }
-
-  // Deduplicate and combine
-  const seenIds = new Set<string>();
-  const allDossiers = [...(recentDossiers ?? []), ...(merchantDossiers ?? [])].filter(
-    (d: Record<string, unknown>) => {
-      const id = d.id as string;
-      if (seenIds.has(id)) return false;
-      seenIds.add(id);
-      return true;
-    }
-  );
-
-  // Build dossier context for Gemini
-  const dossierContext: RecentDossierContext[] = allDossiers.map((d: Record<string, unknown>) => ({
-    id: d.id as string,
-    dossier_type: d.dossier_type as string,
-    title: d.title as string | null,
-    reference: d.reference as string | null,
-    booking_reference: d.booking_reference as string | null,
-    merchant_name:
-      (d.merchants as { canonical_name?: string } | null)?.canonical_name ?? null,
-    status: d.status as string,
-    started_at: d.started_at as string | null,
-  }));
-
-  // C1: If pre-link found a matching dossier, ensure it's in the context (first position)
-  if (preLink) {
-    const alreadyInContext = dossierContext.find((d) => d.id === preLink.dossierId);
-    if (!alreadyInContext) {
-      const { data: preLinkDossier } = await supabase
-        .from("dossiers")
-        .select(
-          "id, dossier_type, title, reference, booking_reference, status, started_at, merchants(canonical_name)"
-        )
-        .eq("id", preLink.dossierId)
-        .single();
-
-      if (preLinkDossier) {
-        const d = preLinkDossier as Record<string, unknown>;
-        dossierContext.unshift({
-          id: d.id as string,
-          dossier_type: d.dossier_type as string,
-          title: d.title as string | null,
-          reference: d.reference as string | null,
-          booking_reference: d.booking_reference as string | null,
-          merchant_name:
-            (d.merchants as { canonical_name?: string } | null)?.canonical_name ?? null,
-          status: d.status as string,
-          started_at: d.started_at as string | null,
-        });
-      }
-    }
-  }
-
-  // Limit context to avoid token explosion
-  const limitedContext = dossierContext.slice(0, 40);
-
-  // 11. Extraction + linking — C7: pass emailType from classification
+  // 11. Extraction — extraction pure, sans contexte de dossiers
   const extractionPrompt = buildExtractionPrompt({
     emailBody,
     subject: rawEmail.subject,
     sender: rawEmail.sender,
     receivedAt: rawEmail.receivedAt.toISOString(),
     emailType: classification.email_type ?? "other",
-    recentDossiers: limitedContext,
   });
+
+  logger.info(`Sending extraction prompt to Gemini...`);
 
   let extraction: ExtractionResult | null = null;
   let rawExtractionResponse: unknown = null;
+
   for (let attempt = 0; attempt < 2; attempt++) {
     let raw: string;
     try {
@@ -686,71 +613,55 @@ async function processItem(queueItem: {
     }
 
     const parsedJson = JSON.parse(sanitizeJson(extractJson(raw)));
-    rawExtractionResponse = parsedJson; // C5: store raw response
+    rawExtractionResponse = parsedJson;
     const parsed = ExtractionSchema.safeParse(parsedJson);
 
     if (parsed.success) {
       extraction = parsed.data;
+      logger.success(
+        `Extraction OK (attempt ${
+          attempt + 1
+        }), type=${extraction.dossier_type}, identifiers=${extraction.identifiers.length}`
+      );
       break;
     }
 
-    console.warn(`Extraction attempt ${attempt + 1} validation failed:`, parsed.error.message);
+    logger.warn(`Extraction attempt ${attempt + 1} failed:`, parsed.error.message);
   }
 
-  // Graceful degradation: if extraction fails, create a minimal dossier rather than losing the email
-  if (!extraction) {
-    console.warn(`Extraction failed for email ${emailId}, creating minimal fallback dossier`);
+  // 12. Combiner les identifiants : Gemini (source=extraction) + regex (source=regex)
+  //     Dédupliquer par (type, value) — Gemini a priorité si doublon.
+  const allIdentifiers: Array<{ type: string; value: string; source: string }> = [];
+  const identifiersSeen = new Set<string>();
 
-    const { data: fallback, error: fallbackError } = await supabase
-      .from("dossiers")
-      .insert({
-        user_id: queueItem.user_id,
-        dossier_type: "purchase", // Better fallback than "other"
-        title: rawEmail.subject || "(sans sujet)",
-        status: "detected",
-        started_at: rawEmail.receivedAt.toISOString(),
-        action_links: [],
-        participants: [],
-      })
-      .select("id")
-      .single();
-
-    if (fallbackError || !fallback) throw new Error(`Fallback dossier insert failed: ${JSON.stringify(fallbackError)}`);
-
-    await supabase.from("dossier_events").upsert(
-      {
-        dossier_id: fallback.id,
-        user_id: queueItem.user_id,
-        email_id: emailId,
-        event_type: "other",
-        extracted_data: {},
-        extraction_confidence: 0,
-        human_summary: `Mail de ${rawEmail.sender} — extraction automatique échouée.`,
-        linked_by: null,
-        linking_confidence: null,
-        raw_gemini_response: rawExtractionResponse,
-      },
-      { onConflict: "email_id", ignoreDuplicates: true },
-    );
-
-    await supabase.from("processing_queue").update({
-      status: "done",
-      processed_at: new Date().toISOString(),
-    }).eq("id", queueItem.id);
-    await updateBackfillProgress(queueItem.mail_account_id);
-
-    console.log(`Fallback dossier ${fallback.id} created for email ${emailId}`);
-    return;
+  if (extraction) {
+    for (const id of extraction.identifiers) {
+      if (id.type && id.value) {
+        const key = `${id.type}:${id.value}`;
+        identifiersSeen.add(key);
+        allIdentifiers.push({
+          type: id.type,
+          value: id.value,
+          source: "extraction",
+        });
+      }
+    }
   }
 
-  const { extracted_data: ex } = extraction;
+  for (const id of regexIdentifiers) {
+    const key = `${id.type}:${id.value}`;
+    if (!identifiersSeen.has(key)) {
+      identifiersSeen.add(key);
+      allIdentifiers.push(id);
+    }
+  }
 
-  // 12. Complete merchant lookup if not found by sender
-  if (!merchantId && ex.merchant_name) {
+  // 13. Complete merchant lookup if not found by sender
+  if (extraction && !merchantId && extraction.extracted_data.merchant_name) {
     const { data: byName } = await supabase
       .from("merchants")
       .select("id, default_return_days, default_warranty_months")
-      .ilike("canonical_name", ex.merchant_name)
+      .ilike("canonical_name", extraction.extracted_data.merchant_name as string)
       .maybeSingle();
 
     if (byName) {
@@ -759,7 +670,51 @@ async function processItem(queueItem: {
     }
   }
 
-  // 13. Calculate deadlines
+  // 14. Graceful degradation: si l'extraction a échoué, créer un dossier minimal via RPC
+  if (!extraction) {
+    logger.warn(`Extraction failed for email ${emailId}, creating minimal fallback dossier`);
+
+    const { error: rpcError } = await supabase.rpc("process_email_result", {
+      p_user_id: queueItem.user_id,
+      p_email_id: emailId,
+      p_dossier_type: "purchase",
+      p_merchant_id: merchantId,
+      p_new_status: "detected",
+      p_dossier_fields: {
+        title: rawEmail.subject || "(sans sujet)",
+        currency: "EUR",
+        started_at: rawEmail.receivedAt.toISOString(),
+        participants: [],
+        action_links: [],
+      },
+      p_event_type: "other",
+      p_extracted_data: {},
+      p_extraction_confidence: 0,
+      p_human_summary: `Mail de ${rawEmail.sender} — extraction automatique échouée.`,
+      p_raw_gemini_response: rawExtractionResponse ?? null,
+      p_identifiers: allIdentifiers,
+    });
+
+    if (rpcError) {
+      throw new Error(`Fallback RPC failed: ${JSON.stringify(rpcError)}`);
+    }
+
+    await supabase
+      .from("processing_queue")
+      .update({
+        status: "done",
+        processed_at: new Date().toISOString(),
+      })
+      .eq("id", queueItem.id);
+    await updateBackfillProgress(queueItem.mail_account_id);
+
+    logger.info(`Fallback dossier created for email ${emailId}`);
+    return;
+  }
+
+  const { extracted_data: ex } = extraction;
+
+  // 15. Calculate deadlines
   const deadlines = calculateDeadlines(
     extraction.dossier_type,
     ex,
@@ -769,150 +724,81 @@ async function processItem(queueItem: {
 
   const newStatus = eventTypeToStatus(extraction.event_type);
 
-  // 14. Link to existing dossier or create new one
-  let dossierId: string;
-  let finalLinkedBy = extraction.linked_by;
-  let finalMatchConfidence = extraction.match_confidence;
+  // 16. Construire le payload dossier_fields pour le RPC
+  const dossierFields: Record<string, unknown> = {
+    title: ex.title ?? null,
+    description: ex.description ?? null,
+    reference: ex.reference ?? null,
+    amount: ex.amount ?? null,
+    currency: ex.currency ?? "EUR",
+    payment_method: ex.payment_method ?? null,
+    started_at: toISO(ex.started_at) ?? rawEmail.receivedAt.toISOString(),
+    ended_at: toISO(ex.ended_at) ?? null,
+    tracking_number: ex.tracking_number ?? null,
+    carrier: ex.carrier ?? null,
+    tracking_url: ex.tracking_url ?? null,
+    pickup_point_name: ex.pickup_point_name ?? null,
+    pickup_point_address: ex.pickup_point_address ?? null,
+    pickup_code: ex.pickup_code ?? null,
+    departure_location: ex.departure_location ?? null,
+    arrival_location: ex.arrival_location ?? null,
+    departure_time: toISO(ex.departure_time) ?? null,
+    arrival_time: toISO(ex.arrival_time) ?? null,
+    flight_or_train_number: ex.flight_or_train_number ?? null,
+    seat_info: ex.seat_info ?? null,
+    booking_reference: ex.booking_reference ?? null,
+    accommodation_address: ex.accommodation_address ?? null,
+    check_in_time: validateTimeFormat(ex.check_in_time) ?? null,
+    check_out_time: validateTimeFormat(ex.check_out_time) ?? null,
+    host_name: ex.host_name ?? null,
+    host_phone: ex.host_phone ?? null,
+    number_of_guests: ex.number_of_guests ?? null,
+    subscription_name: ex.subscription_name ?? null,
+    subscription_amount: ex.subscription_amount ?? null,
+    subscription_period: ex.subscription_period ?? null,
+    participants: ex.participants ?? [],
+    action_links: ex.action_links ?? [],
+    ...deadlines,
+  };
 
-  const shouldLink =
-    extraction.existing_dossier_id &&
-    extraction.match_confidence !== null &&
-    extraction.match_confidence >= 0.8;
+  // 17. Appel RPC atomique — toute la persistance dans une seule transaction Postgres
+  logger.info(`Calling process_email_result RPC with ${allIdentifiers.length} identifiers...`);
 
-  // C1: If Gemini didn't link but pre-link found a match, use the pre-link result
-  const usePreLink = !shouldLink && preLink;
+  const { data: rpcRows, error: rpcError } = (await supabase.rpc("process_email_result", {
+    p_user_id: queueItem.user_id,
+    p_email_id: emailId,
+    p_dossier_type: extraction.dossier_type,
+    p_merchant_id: merchantId,
+    p_new_status: newStatus,
+    p_dossier_fields: dossierFields,
+    p_event_type: extraction.event_type,
+    p_extracted_data: ex,
+    p_extraction_confidence: extraction.extraction_confidence,
+    p_human_summary: extraction.human_summary,
+    p_raw_gemini_response: rawExtractionResponse,
+    p_identifiers: allIdentifiers,
+  })) as {
+    data: Array<{
+      out_dossier_id: string;
+      out_is_new: boolean;
+      out_was_merged: boolean;
+    }> | null;
+    error: unknown;
+  };
 
-  // Retrieve current status of the target dossier from context (to apply resolveStatus)
-  function getCurrentDossierStatus(dossierId: string): string | undefined {
-    return dossierContext.find((d) => d.id === dossierId)?.status;
+  if (rpcError || !rpcRows?.[0]) {
+    throw new Error(`process_email_result RPC failed: ${JSON.stringify(rpcError)}`);
   }
 
-  // Build update payload for linking to existing dossier (avoids duplication)
-  function buildLinkUpdatePayload(targetDossierId: string): Record<string, unknown> {
-    const currentStatus = getCurrentDossierStatus(targetDossierId);
-    const resolvedStatus = resolveStatus(currentStatus, newStatus);
-    const payload: Record<string, unknown> = {
-      status: resolvedStatus,
-      updated_at: new Date().toISOString(),
-    };
-    if (ex.tracking_number) payload.tracking_number = ex.tracking_number;
-    if (ex.tracking_url) payload.tracking_url = ex.tracking_url;
-    if (ex.carrier) payload.carrier = ex.carrier;
-    const depTime = toISO(ex.departure_time);
-    const arrTime = toISO(ex.arrival_time);
-    if (depTime) payload.departure_time = depTime;
-    if (arrTime) payload.arrival_time = arrTime;
-    // C3: check_in/check_out use validateTimeFormat, NOT toISO
-    const checkin = validateTimeFormat(ex.check_in_time);
-    const checkout = validateTimeFormat(ex.check_out_time);
-    if (checkin) payload.check_in_time = checkin;
-    if (checkout) payload.check_out_time = checkout;
-    if (deadlines.return_deadline) payload.return_deadline = deadlines.return_deadline;
-    if (deadlines.warranty_deadline) payload.warranty_deadline = deadlines.warranty_deadline;
-    if (deadlines.next_renewal_at) payload.next_renewal_at = deadlines.next_renewal_at;
-    return payload;
-  }
+  const { out_dossier_id: dossierId, out_is_new: isNew, out_was_merged: wasMerged } = rpcRows[0];
 
-  if (shouldLink && extraction.existing_dossier_id) {
-    dossierId = extraction.existing_dossier_id;
-    await supabase.from("dossiers").update(buildLinkUpdatePayload(dossierId)).eq("id", dossierId);
-  } else if (usePreLink) {
-    // C1: Pre-link matched by SQL reference lookup
-    dossierId = preLink.dossierId;
-    finalLinkedBy = "reference";
-    finalMatchConfidence = 1.0;
-    console.log(`Pre-linked email ${emailId} to dossier ${dossierId} by reference ${preLink.reference}`);
-    await supabase.from("dossiers").update(buildLinkUpdatePayload(dossierId)).eq("id", dossierId);
-  } else {
-    // Create new dossier
-    const newDossier: Record<string, unknown> = {
-      user_id: queueItem.user_id,
-      merchant_id: merchantId,
-      dossier_type: extraction.dossier_type,
-      title: ex.title,
-      description: ex.description,
-      reference: ex.reference,
-      amount: ex.amount,
-      currency: ex.currency ?? "EUR",
-      status: newStatus,
-      payment_method: ex.payment_method,
-      started_at: toISO(ex.started_at) ?? rawEmail.receivedAt.toISOString(),
-      ended_at: toISO(ex.ended_at),
-      tracking_number: ex.tracking_number,
-      carrier: ex.carrier,
-      tracking_url: ex.tracking_url,
-      pickup_point_name: ex.pickup_point_name,
-      pickup_point_address: ex.pickup_point_address,
-      pickup_code: ex.pickup_code,
-      departure_location: ex.departure_location,
-      arrival_location: ex.arrival_location,
-      departure_time: toISO(ex.departure_time),
-      arrival_time: toISO(ex.arrival_time),
-      flight_or_train_number: ex.flight_or_train_number,
-      seat_info: ex.seat_info,
-      booking_reference: ex.booking_reference,
-      accommodation_address: ex.accommodation_address,
-      // C3: check_in/check_out use validateTimeFormat, NOT toISO
-      check_in_time: validateTimeFormat(ex.check_in_time),
-      check_out_time: validateTimeFormat(ex.check_out_time),
-      host_name: ex.host_name,
-      host_phone: ex.host_phone,
-      number_of_guests: ex.number_of_guests,
-      subscription_name: ex.subscription_name,
-      subscription_amount: ex.subscription_amount,
-      subscription_period: ex.subscription_period,
-      participants: ex.participants ?? [],
-      action_links: ex.action_links ?? [],
-      ...deadlines,
-    };
-
-    // Remove null values to let DB defaults apply
-    for (const key of Object.keys(newDossier)) {
-      if (newDossier[key] === null || newDossier[key] === undefined) {
-        delete newDossier[key];
-      }
-    }
-
-    const { data: created, error: createError } = await supabase
-      .from("dossiers")
-      .insert(newDossier)
-      .select("id")
-      .single();
-
-    if (createError || !created)
-      throw new Error(`Dossier insert failed: ${JSON.stringify(createError)}`);
-    dossierId = created.id as string;
-  }
-
-  // 15. Upsert dossier_event — idempotent via UNIQUE(email_id)
-  const isLinked = shouldLink || usePreLink;
-  const { error: eventError } = await supabase.from("dossier_events").upsert(
-    {
-      dossier_id: dossierId,
-      user_id: queueItem.user_id,
-      email_id: emailId,
-      event_type: extraction.event_type,
-      extracted_data: ex,
-      extraction_confidence: extraction.extraction_confidence,
-      human_summary: extraction.human_summary,
-      linked_by: isLinked ? (finalLinkedBy ?? "llm") : null,
-      linking_confidence: isLinked ? finalMatchConfidence : null,
-      raw_gemini_response: rawExtractionResponse,
-    },
-    { onConflict: "email_id", ignoreDuplicates: true },
-  );
-
-  if (eventError) throw new Error(`Event upsert failed: ${JSON.stringify(eventError)}`);
-
-  // 16. Update email as processed
+  // 18. Update email as processed
   await supabase
     .from("emails")
-    .update({
-      processed_at: new Date().toISOString(),
-    })
+    .update({ processed_at: new Date().toISOString() })
     .eq("id", emailId);
 
-  // 17. Mark queue item as done
+  // 19. Mark queue item as done
   await supabase
     .from("processing_queue")
     .update({
@@ -922,7 +808,8 @@ async function processItem(queueItem: {
     .eq("id", queueItem.id);
   await updateBackfillProgress(queueItem.mail_account_id);
 
-  console.log(`Successfully processed email ${emailId} → dossier ${dossierId}${isLinked ? ` (linked by ${finalLinkedBy})` : ' (new)'}`);
+  const linkStatus = isNew ? "new dossier" : wasMerged ? "linked (merged)" : "linked (identifier)";
+  logger.success(`Successfully processed email ${emailId} → dossier ${dossierId} (${linkStatus})`);
 }
 
 // ---------------------------------------------------------------------------
@@ -937,7 +824,7 @@ Deno.serve(async (_req: Request) => {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("process-queue fatal error:", err);
+    logger.error("process-queue fatal error:", err);
     return new Response("Error", { status: 500 });
   }
 });

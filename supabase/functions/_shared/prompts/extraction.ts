@@ -1,32 +1,26 @@
 // ============================================================
-// PROMPT GEMINI — EXTRACTION + LINKING v3
+// PROMPT GEMINI — EXTRACTION v4
 // ============================================================
+// Suppression du linking Gemini : extraction pure uniquement.
+// Le linking est désormais déterministe via la table dossier_identifiers.
 
-export const EXTRACTION_PROMPT_VERSION = '3.0.0';
-
-export type RecentDossierContext = {
-  id: string;
-  dossier_type: string;
-  title: string | null;
-  reference: string | null;
-  booking_reference: string | null;
-  merchant_name: string | null;
-  status: string;
-  started_at: string | null;
-};
+export const EXTRACTION_PROMPT_VERSION = "4.0.0";
 
 // Helper: suggest dossier_type from classification's email_type
 function getTypeSuggestion(emailType: string): string {
   const map: Record<string, string> = {
     order_confirmation: 'Ce mail est probablement un "purchase".',
-    payment_confirmation: 'Ce mail est probablement un "purchase" ou "subscription".',
+    payment_confirmation:
+      'Ce mail est probablement un "purchase" ou "subscription".',
     shipping_notification: 'Ce mail est probablement un "purchase".',
     delivery_notification: 'Ce mail est probablement un "purchase".',
     invoice: 'Ce mail peut être un "purchase", "subscription" ou "booking".',
     return_confirmation: 'Ce mail est probablement un "purchase".',
-    cancellation: 'Détermine le type à partir du contexte du mail.',
-    booking_confirmation: 'Ce mail est probablement un "travel", "booking" ou "accommodation".',
-    booking_update: 'Ce mail est probablement un "travel", "booking" ou "accommodation".',
+    cancellation: "Détermine le type à partir du contexte du mail.",
+    booking_confirmation:
+      'Ce mail est probablement un "travel", "booking" ou "accommodation".',
+    booking_update:
+      'Ce mail est probablement un "travel", "booking" ou "accommodation".',
     check_in_open: 'Ce mail est probablement un "travel".',
     boarding_pass: 'Ce mail est probablement un "travel".',
     accommodation_confirmation: 'Ce mail est probablement un "accommodation".',
@@ -36,7 +30,7 @@ function getTypeSuggestion(emailType: string): string {
     subscription_renewal: 'Ce mail est probablement un "subscription".',
     subscription_cancellation: 'Ce mail est probablement un "subscription".',
   };
-  return map[emailType] ?? '';
+  return map[emailType] ?? "";
 }
 
 export function buildExtractionPrompt(params: {
@@ -45,12 +39,7 @@ export function buildExtractionPrompt(params: {
   sender: string;
   receivedAt: string;
   emailType: string;
-  recentDossiers: RecentDossierContext[];
 }): string {
-  const dossiersJson = params.recentDossiers.length > 0
-    ? JSON.stringify(params.recentDossiers, null, 2)
-    : '(aucun dossier récent)';
-
   const typeSuggestion = getTypeSuggestion(params.emailType);
 
   return `Tu es l'assistant d'extraction de données de Sésame, un coffre-fort personnel intelligent.
@@ -65,7 +54,7 @@ CORPS DU MAIL:
 ${params.emailBody.slice(0, 8000)}
 ---
 
-## ÉTAPE 1 : EXTRACTION
+## EXTRACTION
 
 ### CHOIX DU dossier_type
 
@@ -228,36 +217,27 @@ Exemples par event_type :
 
 ---
 
-## ÉTAPE 2 : LINKING
+### IDENTIFIANTS À EXTRAIRE (CRITIQUE)
 
-Compare ce mail avec les dossiers existants de l'utilisateur.
+Extrais TOUS les codes, références et identifiants trouvés dans le mail.
+Ce sont les clés qui permettent de relier les mails entre eux automatiquement.
 
-DOSSIERS RÉCENTS :
-${dossiersJson}
+| identifier_type    | Quand l'utiliser                                         | Exemples |
+|---|---|---|
+| order_ref          | Numéro de commande marchand                              | "403-2833463-9128327", "F905LQ80393", "ksfr-1005-5977219" |
+| tracking_number    | Numéro de suivi colis (tout transporteur)                | "00K6Y20G", "6A15546300134", "CB123456789FR" |
+| pnr                | Code de réservation transport (vol, train)               | "XLMSHR", "FXGMFZ", "4WK3Y7" |
+| booking_id         | Référence de réservation (hébergement, restaurant, activité) | "HMBWBMSM4Z", "6532339077", "RES-987654" |
+| confirmation_code  | Code de confirmation de paiement ou transaction          | "TXN-12345" |
+| invoice_number     | Numéro de facture                                        | "F905LQ80393", "FAC-2025-001" |
+| ride_id            | Identifiant de course VTC/taxi                           | "ride_abc123" |
 
-### RÈGLES DE LINKING (hiérarchie stricte) :
-
-**1. Match par référence** (linked_by: "reference", match_confidence: 1.0) :
-Le mail contient la MÊME référence ou booking_reference qu'un dossier existant (comparaison exacte).
-C'est le seul match fiable à 100 %. Exemples :
-- Mail de shipping avec réf "407-2032226-8712344" → dossier avec reference "407-2032226-8712344"
-- Mail de check-in avec réf "XLMSHR" → dossier avec booking_reference "XLMSHR"
-
-**2. Match par suivi de même commande** (linked_by: "fuzzy_match", match_confidence: 0.85-0.95) :
-À utiliser UNIQUEMENT si TOUTES ces conditions sont vraies :
-- Même marchand/expéditeur
-- Le mail est un EVENT DE SUIVI (shipping, delivery, update, invoice) d'une commande en cours
-- Il n'existe qu'UN SEUL dossier actif de ce marchand (ou le mail mentionne clairement le même produit)
-⚠️ NE PAS lier si : le mail concerne un nouveau produit, une nouvelle commande, ou si plusieurs dossiers du même marchand existent.
-⚠️ NE PAS lier deux commandes distinctes juste parce qu'elles viennent du même marchand.
-
-**3. Match sémantique fort** (linked_by: "llm", match_confidence: 0.8-0.9) :
-Lien inféré avec forte certitude : dates très proches + même destination + contexte cohérent.
-À utiliser avec parcimonie.
-
-Si AUCUN match avec confidence >= 0.8 : existing_dossier_id = null, linked_by = null, match_confidence = null.
-
-⚠️ Ne jamais lier un mail à un dossier de type différent (ex: un shipping à un dossier travel).
+Règles STRICTES :
+- Extraire TOUS les identifiants présents, même si le type est incertain. Un identifiant en trop qui ne matche rien est inoffensif. Un identifiant raté = un linking perdu.
+- Un même mail peut contenir plusieurs types différents (ex: shipping Amazon → order_ref + tracking_number).
+- Si un code apparaît dans le sujet ET dans le corps, ne le lister qu'une fois.
+- Ne PAS inclure les montants, dates, noms de personne ou adresses.
+- Les valeurs doivent être les chaînes EXACTES telles qu'elles apparaissent dans le mail (pas de normalisation).
 
 ---
 
@@ -266,11 +246,12 @@ Retourne UNIQUEMENT ce JSON (sans markdown, sans commentaire) :
   "dossier_type": string,
   "event_type": string,
   "extracted_data": { ... les champs selon le dossier_type ci-dessus ... },
+  "identifiers": [
+    { "type": "order_ref", "value": "403-2833463-9128327" },
+    { "type": "tracking_number", "value": "00K6Y20G" }
+  ],
   "human_summary": string,
-  "extraction_confidence": number (0 à 1),
-  "existing_dossier_id": string | null,
-  "linked_by": "reference" | "fuzzy_match" | "llm" | null,
-  "match_confidence": number | null
+  "extraction_confidence": number (0 à 1)
 }`;
 }
 
@@ -278,9 +259,7 @@ export type ExtractionResult = {
   dossier_type: string;
   event_type: string;
   extracted_data: Record<string, unknown>;
+  identifiers: Array<{ type: string; value: string }>;
   human_summary: string;
   extraction_confidence: number;
-  existing_dossier_id: string | null;
-  linked_by: 'reference' | 'fuzzy_match' | 'llm' | null;
-  match_confidence: number | null;
 };

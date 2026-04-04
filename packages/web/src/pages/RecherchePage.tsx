@@ -14,7 +14,8 @@ import React, { useEffect, useRef } from "react";
 
 export function RecherchePage(): React.JSX.Element {
   const user = useAuthStore((s) => s.user);
-  const { history, addToHistory } = useSearchStore();
+  const history = useSearchStore((s) => s.history);
+  const addToHistory = useSearchStore((s) => s.addToHistory);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { search, debouncedSearch, handleSearchChange, setSearchImmediate, clearSearch } =

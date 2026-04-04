@@ -2,7 +2,7 @@
 // PROMPT GEMINI — CLASSIFICATION v2
 // ============================================================
 
-export const CLASSIFICATION_PROMPT_VERSION = '3.0.0';
+export const CLASSIFICATION_PROMPT_VERSION = "3.0.0";
 
 export function buildClassificationPrompt(params: {
   subject: string;

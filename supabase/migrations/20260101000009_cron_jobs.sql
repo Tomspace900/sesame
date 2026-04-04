@@ -51,4 +51,22 @@ SELECT cron.schedule(
   $cron$
 );
 
+-- ============================================================
+-- JOB 3 — check-deadlines (tous les jours à 8h UTC = 9h CET)
+-- Vérifie les deadlines et envoie les rappels Telegram
+-- ============================================================
+
+SELECT cron.schedule(
+  'sesame-check-deadlines',
+  '0 8 * * *',
+  $cron$
+  SELECT net.http_post(
+    url        := 'http://host.docker.internal:54321/functions/v1/check-deadlines',
+    headers    := '{"Content-Type": "application/json"}'::jsonb,
+    body       := '{}'::jsonb,
+    timeout_milliseconds := 55000
+  );
+  $cron$
+);
+
 -- Vérification : SELECT * FROM cron.job_run_details ORDER BY start_time DESC LIMIT 20;

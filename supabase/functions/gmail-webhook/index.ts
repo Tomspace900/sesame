@@ -2,19 +2,21 @@
 // Receives Google Pub/Sub push notifications when new Gmail messages arrive.
 // Decodes the historyId and enqueues new messages for processing.
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { jsonSuccess, jsonError } from '../_shared/response.ts';
-import { handleCors } from '../_shared/cors.ts';
-import { decryptToken, encryptToken } from '../_shared/crypto.ts';
-import { refreshAccessToken, getHistoryMessages } from '../_shared/gmail.ts';
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { jsonError, jsonSuccess } from "../_shared/response.ts";
+import { handleCors } from "../_shared/cors.ts";
+import { decryptToken, encryptToken } from "../_shared/crypto.ts";
+import { getHistoryMessages, refreshAccessToken } from "../_shared/gmail.ts";
+import { createLogger } from "../_shared/logger.ts";
+const logger = createLogger("gmail-webhook");
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!;
-const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
-const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY')!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY")!;
 // Simple shared secret: configure your Pub/Sub subscription push URL with ?token=SECRET
-const PUBSUB_SECRET = Deno.env.get('PUBSUB_SECRET') ?? '';
+const PUBSUB_SECRET = Deno.env.get("PUBSUB_SECRET") ?? "";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -24,22 +26,24 @@ Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
+  logger.info(`Received ${req.method} request`);
+
   // Validate shared secret token
   const url = new URL(req.url);
-  const token = url.searchParams.get('token');
+  const token = url.searchParams.get("token");
   if (PUBSUB_SECRET && token !== PUBSUB_SECRET) {
-    return jsonError('Unauthorized', 'UNAUTHORIZED', 401);
+    return jsonError("Unauthorized", "UNAUTHORIZED", 401);
   }
 
-  if (req.method !== 'POST') {
-    return jsonError('Method not allowed', 'METHOD_NOT_ALLOWED', 405);
+  if (req.method !== "POST") {
+    return jsonError("Method not allowed", "METHOD_NOT_ALLOWED", 405);
   }
 
   let body: { message?: { data?: string }; subscription?: string };
   try {
     body = await req.json();
   } catch {
-    return jsonError('Invalid JSON body', 'INVALID_BODY', 400);
+    return jsonError("Invalid JSON body", "INVALID_BODY", 400);
   }
 
   const messageData = body.message?.data;
@@ -51,28 +55,33 @@ Deno.serve(async (req: Request) => {
   // Decode base64url Pub/Sub message payload
   let pubsubPayload: { emailAddress?: string; historyId?: string };
   try {
-    const decoded = atob(messageData.replace(/-/g, '+').replace(/_/g, '/'));
+    const decoded = atob(messageData.replace(/-/g, "+").replace(/_/g, "/"));
     pubsubPayload = JSON.parse(decoded);
   } catch {
-    console.error('Failed to decode Pub/Sub message data:', messageData);
+    logger.error("Failed to decode Pub/Sub message data:", messageData);
     return jsonSuccess({ queued: 0 }); // Ack to avoid infinite retry
   }
 
   const { emailAddress, historyId: newHistoryId } = pubsubPayload;
+  logger.info(
+    `Extracted payload - email: ${emailAddress}, historyId: ${newHistoryId}`,
+  );
   if (!emailAddress || !newHistoryId) {
     return jsonSuccess({ queued: 0 });
   }
 
   // Find the mail account for this Gmail address
   const { data: mailAccount, error: accountError } = await supabase
-    .from('mail_accounts')
-    .select('id, user_id, history_id, access_token_encrypted, refresh_token_encrypted, token_expires_at')
-    .eq('email_address', emailAddress)
-    .eq('provider', 'gmail')
+    .from("mail_accounts")
+    .select(
+      "id, user_id, history_id, access_token_encrypted, refresh_token_encrypted, token_expires_at",
+    )
+    .eq("email_address", emailAddress)
+    .eq("provider", "gmail")
     .maybeSingle();
 
   if (accountError || !mailAccount) {
-    console.error('mail_account not found for', emailAddress);
+    logger.error("mail_account not found for", emailAddress);
     return jsonSuccess({ queued: 0 });
   }
 
@@ -85,24 +94,37 @@ Deno.serve(async (req: Request) => {
     const needsRefresh = expiresAt.getTime() - Date.now() < 5 * 60 * 1000;
 
     if (needsRefresh) {
-      const refreshToken = await decryptToken(mailAccount.refresh_token_encrypted, ENCRYPTION_KEY);
-      const refreshed = await refreshAccessToken(refreshToken, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET);
+      const refreshToken = await decryptToken(
+        mailAccount.refresh_token_encrypted,
+        ENCRYPTION_KEY,
+      );
+      const refreshed = await refreshAccessToken(
+        refreshToken,
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+      );
       accessToken = refreshed.access_token;
 
-      const encryptedNew = await encryptToken(refreshed.access_token, ENCRYPTION_KEY);
+      const encryptedNew = await encryptToken(
+        refreshed.access_token,
+        ENCRYPTION_KEY,
+      );
       await supabase
-        .from('mail_accounts')
+        .from("mail_accounts")
         .update({
           access_token_encrypted: encryptedNew,
           token_expires_at: refreshed.expires_at.toISOString(),
         })
-        .eq('id', mailAccount.id);
+        .eq("id", mailAccount.id);
     } else {
-      accessToken = await decryptToken(mailAccount.access_token_encrypted, ENCRYPTION_KEY);
+      accessToken = await decryptToken(
+        mailAccount.access_token_encrypted,
+        ENCRYPTION_KEY,
+      );
     }
   } catch (err) {
-    console.error('Token error for', emailAddress, err);
-    return jsonError('Token error', 'TOKEN_ERROR', 500);
+    logger.error("Token error for", emailAddress, err);
+    return jsonError("Token error", "TOKEN_ERROR", 500);
   }
 
   // Use the stored historyId as startHistoryId for Gmail history.list
@@ -112,15 +134,18 @@ Deno.serve(async (req: Request) => {
   try {
     newMessages = await getHistoryMessages(accessToken, startHistoryId);
   } catch (err) {
-    console.error('History fetch error:', err);
+    logger.error("History fetch error:", err);
     // Still update history_id so we don't re-process old messages next time
   }
 
   // Update the stored historyId to the latest
   await supabase
-    .from('mail_accounts')
-    .update({ history_id: newHistoryId, last_sync_at: new Date().toISOString() })
-    .eq('id', mailAccount.id);
+    .from("mail_accounts")
+    .update({
+      history_id: newHistoryId,
+      last_sync_at: new Date().toISOString(),
+    })
+    .eq("id", mailAccount.id);
 
   if (newMessages.length === 0) {
     return jsonSuccess({ queued: 0 });
@@ -132,19 +157,22 @@ Deno.serve(async (req: Request) => {
     mail_account_id: mailAccount.id,
     provider_message_id: msg.id,
     priority: 10, // New real-time messages get higher priority than backfill
-    status: 'pending',
+    status: "pending",
   }));
 
   const { error: queueError } = await supabase
-    .from('processing_queue')
+    .from("processing_queue")
     .upsert(queueItems, {
-      onConflict: 'user_id,mail_account_id,provider_message_id',
+      onConflict: "user_id,mail_account_id,provider_message_id",
       ignoreDuplicates: true,
     });
 
   if (queueError) {
-    console.error('Queue insert error:', queueError);
+    logger.error("Queue insert error:", queueError);
   }
 
+  logger.success(
+    `Successfully queued ${newMessages.length} messages for ${emailAddress}`,
+  );
   return jsonSuccess({ queued: newMessages.length });
 });

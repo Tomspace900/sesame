@@ -2,60 +2,71 @@
 // Called by Google after the user authorizes Gmail access.
 // Exchanges the code for tokens, stores them, and sets up Gmail Pub/Sub watch.
 
-import { createClient } from 'npm:@supabase/supabase-js@2';
-import { encryptToken } from '../_shared/crypto.ts';
-import { setupWatch } from '../_shared/gmail.ts';
+import { createClient } from "npm:@supabase/supabase-js@2";
+import { encryptToken } from "../_shared/crypto.ts";
+import { setupWatch } from "../_shared/gmail.ts";
+import { createLogger } from "../_shared/logger.ts";
+const logger = createLogger("oauth-callback");
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')!;
-const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')!;
-const GOOGLE_PUBSUB_TOPIC = Deno.env.get('GOOGLE_PUBSUB_TOPIC')!;
-const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY')!;
-const APP_URL = Deno.env.get('APP_URL') ?? 'http://localhost:5173';
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+const GOOGLE_PUBSUB_TOPIC = Deno.env.get("GOOGLE_PUBSUB_TOPIC")!;
+const ENCRYPTION_KEY = Deno.env.get("ENCRYPTION_KEY")!;
+const APP_URL = Deno.env.get("APP_URL") ?? "http://localhost:5173";
 // Explicit redirect URI — req.url is an internal Docker hostname inside Edge Runtime,
 // so it cannot be derived from the request. Must match exactly what the frontend sends.
-const OAUTH_REDIRECT_URI = Deno.env.get('OAUTH_REDIRECT_URI') ?? `${SUPABASE_URL}/functions/v1/oauth-callback`;
+const OAUTH_REDIRECT_URI = Deno.env.get("OAUTH_REDIRECT_URI") ??
+  `${SUPABASE_URL}/functions/v1/oauth-callback`;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
 Deno.serve(async (req: Request) => {
+  logger.info(`Received ${req.method} request for OAuth completion`);
+
   const url = new URL(req.url);
-  const code = url.searchParams.get('code');
-  const stateParam = url.searchParams.get('state'); // user_id or user_id:context
-  const error = url.searchParams.get('error');
+  const code = url.searchParams.get("code");
+  const stateParam = url.searchParams.get("state"); // user_id or user_id:context
+  const error = url.searchParams.get("error");
 
   // Parse optional context from state (e.g. "user123:onboarding")
-  const parsedState = stateParam ?? '';
-  const colonIdx = parsedState.indexOf(':');
+  const parsedState = stateParam ?? "";
+  const colonIdx = parsedState.indexOf(":");
   const userId = colonIdx >= 0 ? parsedState.slice(0, colonIdx) : parsedState;
-  const oauthContext = colonIdx >= 0 ? parsedState.slice(colonIdx + 1) : '';
-  const returnPath = oauthContext === 'onboarding' ? '/bienvenue' : '/reglages/connecter/gmail';
+  const oauthContext = colonIdx >= 0 ? parsedState.slice(colonIdx + 1) : "";
+  const returnPath = oauthContext === "onboarding"
+    ? "/bienvenue"
+    : "/reglages/connecter/gmail";
 
   if (error) {
-    console.error('OAuth error from Google:', error);
+    logger.error("OAuth error from Google:", error);
     return Response.redirect(`${APP_URL}${returnPath}?error=${error}`, 302);
   }
 
   if (!code || !stateParam) {
-    return Response.redirect(`${APP_URL}/reglages/connecter/gmail?error=missing_params`, 302);
+    logger.warn(`Missing code or state parameters`);
+    return Response.redirect(
+      `${APP_URL}/reglages/connecter/gmail?error=missing_params`,
+      302,
+    );
   }
 
   const redirectUri = OAUTH_REDIRECT_URI;
 
   try {
     // 1. Exchange authorization code for tokens
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
         client_id: GOOGLE_CLIENT_ID,
         client_secret: GOOGLE_CLIENT_SECRET,
         redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
+        grant_type: "authorization_code",
       }).toString(),
     });
 
@@ -79,13 +90,18 @@ Deno.serve(async (req: Request) => {
     }
 
     // 2. Get user's Gmail address from Google userinfo
-    const userinfoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
-      headers: { Authorization: `Bearer ${tokens.access_token}` },
-    });
+    const userinfoRes = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      },
+    );
 
     if (!userinfoRes.ok) {
       const body = await userinfoRes.text();
-      throw new Error(`Failed to fetch Google userinfo: ${userinfoRes.status} ${body}`);
+      throw new Error(
+        `Failed to fetch Google userinfo: ${userinfoRes.status} ${body}`,
+      );
     }
 
     const userinfo = await userinfoRes.json() as { email: string };
@@ -93,31 +109,44 @@ Deno.serve(async (req: Request) => {
 
     // 3. Check email uniqueness across Sésame accounts
     const { data: existingAccount } = await supabase
-      .from('mail_accounts')
-      .select('user_id')
-      .eq('email_address', emailAddress)
-      .neq('user_id', userId)
+      .from("mail_accounts")
+      .select("user_id")
+      .eq("email_address", emailAddress)
+      .neq("user_id", userId)
       .maybeSingle();
 
     if (existingAccount) {
-      return Response.redirect(`${APP_URL}${returnPath}?error=email_already_used`, 302);
+      return Response.redirect(
+        `${APP_URL}${returnPath}?error=email_already_used`,
+        302,
+      );
     }
 
     // 4. Encrypt tokens before storage
-    const accessTokenEncrypted = await encryptToken(tokens.access_token, ENCRYPTION_KEY);
-    const refreshTokenEncrypted = await encryptToken(tokens.refresh_token, ENCRYPTION_KEY);
-    const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+    const accessTokenEncrypted = await encryptToken(
+      tokens.access_token,
+      ENCRYPTION_KEY,
+    );
+    const refreshTokenEncrypted = await encryptToken(
+      tokens.refresh_token,
+      ENCRYPTION_KEY,
+    );
+    const tokenExpiresAt = new Date(Date.now() + tokens.expires_in * 1000)
+      .toISOString();
 
     // 4. Setup Gmail Pub/Sub watch
-    const { historyId, expiration } = await setupWatch(tokens.access_token, GOOGLE_PUBSUB_TOPIC);
+    const { historyId, expiration } = await setupWatch(
+      tokens.access_token,
+      GOOGLE_PUBSUB_TOPIC,
+    );
 
     // 5. Upsert mail_account record
     const { data: mailAccount, error: dbError } = await supabase
-      .from('mail_accounts')
+      .from("mail_accounts")
       .upsert(
         {
           user_id: userId,
-          provider: 'gmail',
+          provider: "gmail",
           email_address: emailAddress,
           access_token_encrypted: accessTokenEncrypted,
           refresh_token_encrypted: refreshTokenEncrypted,
@@ -125,23 +154,27 @@ Deno.serve(async (req: Request) => {
           watch_expiration: expiration.toISOString(),
           history_id: historyId,
           last_sync_at: new Date().toISOString(),
-          backfill_status: 'idle',
+          backfill_status: "idle",
         },
-        { onConflict: 'user_id,provider,email_address' },
+        { onConflict: "user_id,provider,email_address" },
       )
-      .select('id')
+      .select("id")
       .single();
 
     if (dbError) throw new Error(`DB upsert failed: ${dbError.message}`);
 
-    const accountId = mailAccount?.id ?? '';
+    logger.success(
+      `Successfully completed OAuth flow for ${emailAddress} (user ${userId})`,
+    );
+
+    const accountId = mailAccount?.id ?? "";
     return Response.redirect(
       `${APP_URL}${returnPath}?status=success&account_id=${accountId}`,
       302,
     );
   } catch (err) {
-    console.error('oauth-callback error:', err);
-    const message = err instanceof Error ? err.message : 'unknown_error';
+    logger.error("oauth-callback error:", err);
+    const message = err instanceof Error ? err.message : "unknown_error";
     return Response.redirect(
       `${APP_URL}${returnPath}?error=${encodeURIComponent(message)}`,
       302,
